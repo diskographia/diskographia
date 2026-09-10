@@ -1,0 +1,143 @@
+name: проверки
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# новый пуш в ветку отменяет предыдущий прогон
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: типы, линтер, сборки
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: общий пакет
+        run: pnpm --filter @diskographia/shared build
+
+      - name: типы
+        run: pnpm typecheck
+
+      - name: линтер
+        run: pnpm lint
+
+      - name: сервер
+        run: pnpm --filter @diskographia/server build
+
+      - name: клиент
+        run: pnpm --filter @diskographia/client build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000/api
+          NEXT_PUBLIC_UPLOADS_URL: http://localhost:4000/uploads
+          NEXT_PUBLIC_PLATFORM_HANDLE: discography
+          NEXT_PUBLIC_HOME_SELECTION_SLUG: home-selection
+          NEXT_PUBLIC_HOME_SHOWCASE_SLUG: home-showcase
+          NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG: manifest
+          NEXT_PUBLIC_DEMO_MODE: 'true'
+
+  migrations:
+    name: миграции на чистой базе
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: diskographia
+          POSTGRES_USER: diskographia
+          POSTGRES_PASSWORD: diskographia
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U diskographia -d diskographia"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: общий пакет
+        run: pnpm --filter @diskographia/shared build
+
+      - name: прогон миграций
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgresql://diskographia:diskographia@localhost:5432/diskographia
+          JWT_SECRET: ${{ github.sha }}${{ github.sha }}
+
+  images:
+    name: образы
+    needs: [check, migrations]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: образ сервера
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/server/Dockerfile
+          push: false
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+      - name: образ клиента
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/client/Dockerfile
+          push: false
+          cache-from: type=gha,scope=client
+          cache-to: type=gha,mode=max,scope=client
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://localhost:4000/api
+            NEXT_PUBLIC_UPLOADS_URL=http://localhost:4000/uploads
+            NEXT_PUBLIC_PLATFORM_HANDLE=discography
+            NEXT_PUBLIC_HOME_SELECTION_SLUG=home-selection
+            NEXT_PUBLIC_HOME_SHOWCASE_SLUG=home-showcase
+            NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG=manifest
+            NEXT_PUBLIC_DEMO_MODE=true
+
+  stand:
+    name: разбор стенда
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: docker-compose
+        run: |
+          cp .env.production.example .env.production
+          docker compose --env-file .env.production config >/dev/null
+
+      - name: конфиг caddy
+        run: |
+          docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

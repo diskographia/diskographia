@@ -1,0 +1,41 @@
+# caddy стоит на самой машине, а не в контейнере, и держит сертификаты сам
+# файл кладётся в /etc/caddy/Caddyfile, проверка: caddy validate --config /etc/caddy/Caddyfile
+# перечитать без простоя: sudo systemctl reload caddy
+
+diskographia.ru, www.diskographia.ru {
+	encode zstd gzip
+
+	# файл до двухсот мегабайт, тот же предел стоит на сервере в UPLOAD_MAX_BYTES
+	request_body {
+		max_size 210MB
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:4000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}
+
+# пользовательские файлы живут на отдельном имени, чтобы чужой скрипт не оказался на нашем
+files.diskographia.ru {
+	root * /srv/diskographia/uploads
+	file_server
+
+	header {
+		X-Content-Type-Options nosniff
+		Content-Security-Policy "default-src 'none'; sandbox"
+		Cross-Origin-Resource-Policy cross-origin
+		Cache-Control "public, max-age=2592000"
+	}
+}

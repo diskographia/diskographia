@@ -1,0 +1,43 @@
+{
+  "name": "@diskographia/server",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "seed:admin": "node dist/database/seed-admin.js",
+    "seed:clean": "node dist/database/seed-clean.js"
+  },
+  "dependencies": {
+    "@diskographia/shared": "workspace:*",
+    "@nestjs/common": "^11.2.1",
+    "@nestjs/core": "^11.2.1",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/platform-express": "^11.2.1",
+    "busboy": "^1.6.0",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "file-type": "^22.0.2",
+    "music-metadata": "^11.15.0",
+    "postgres": "^3.4.9",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "sharp": "^0.35.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/schematics": "^11.1.0",
+    "@types/busboy": "^1.5.4",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.19.43",
+    "drizzle-kit": "^0.31.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

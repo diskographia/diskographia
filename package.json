@@ -1,0 +1,17 @@
+{
+  "name": "diskographia",
+  "private": true,
+  "packageManager": "pnpm@11.23.0",
+  "scripts": {
+    "build": "pnpm --filter @diskographia/shared build && pnpm --filter @diskographia/server build && pnpm --filter @diskographia/client build",
+    "typecheck": "pnpm -r exec tsc --noEmit",
+    "lint": "pnpm --filter @diskographia/client exec eslint src",
+    "db:migrate": "pnpm --filter @diskographia/server db:migrate",
+    "seed:admin": "pnpm --filter @diskographia/server seed:admin",
+    "seed:clean": "pnpm --filter @diskographia/server seed:clean",
+    "assets": "node tools/prepare-assets.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3"
+  }
+}
