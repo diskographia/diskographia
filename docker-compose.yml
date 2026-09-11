@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      UPLOADS_DIR: /uploads
+    # наружу порт не смотрит: снаружи стоит caddy на самой машине
+    ports:
+      - '127.0.0.1:${SERVER_PORT:-4000}:4000'
+    volumes:
+      - ${UPLOADS_HOST_DIR:-./uploads}:/uploads
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4000/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  client:
+    build:
+      context: .
+      dockerfile: apps/client/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_UPLOADS_URL: ${NEXT_PUBLIC_UPLOADS_URL}
+        NEXT_PUBLIC_PLATFORM_HANDLE: ${NEXT_PUBLIC_PLATFORM_HANDLE}
+        NEXT_PUBLIC_HOME_SELECTION_SLUG: ${NEXT_PUBLIC_HOME_SELECTION_SLUG}
+        NEXT_PUBLIC_HOME_SHOWCASE_SLUG: ${NEXT_PUBLIC_HOME_SHOWCASE_SLUG}
+        NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG: ${NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG}
+        NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_UPLOADS_URL: ${NEXT_PUBLIC_UPLOADS_URL}
+      NEXT_PUBLIC_PLATFORM_HANDLE: ${NEXT_PUBLIC_PLATFORM_HANDLE}
+      NEXT_PUBLIC_HOME_SELECTION_SLUG: ${NEXT_PUBLIC_HOME_SELECTION_SLUG}
+      NEXT_PUBLIC_HOME_SHOWCASE_SLUG: ${NEXT_PUBLIC_HOME_SHOWCASE_SLUG}
+      NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG: ${NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG}
+      NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE}
+    ports:
+      - '127.0.0.1:${CLIENT_PORT:-3000}:3000'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/vhod').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    depends_on:
+      server:
+        condition: service_healthy
+
+volumes:
+  postgres:
