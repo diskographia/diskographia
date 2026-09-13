@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { request } from '@/api/browser';
+import { ZONE } from '@/api/time';
 import type { ScheduleEntry } from '@/api/types';
 import { ConfirmButton } from '@/components/confirm-button';
 import { Modal } from '@/components/modal';
 
-const dayLabel = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const dayLabel = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 function isoOrNull(value: FormDataEntryValue | null): string | null {
   const text = String(value ?? '').trim();

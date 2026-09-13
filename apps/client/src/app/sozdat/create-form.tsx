@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
+import { startTransition, useActionState, useRef, useState } from 'react';
 
 import type { EntityKind } from '@/api/types';
 import { DetailFields, IdentityFields } from '@/components/entity/entity-fields';
@@ -30,7 +30,16 @@ export function CreateForm({ platform }: { platform: boolean }) {
   const { dirty } = useDirty(form, null);
 
   return (
-    <form ref={form} action={action} onKeyDown={keepEnter} className="contents">
+    <form
+      ref={form}
+      onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        startTransition(() => action(data));
+      }}
+      onKeyDown={keepEnter}
+      className="contents"
+    >
       <LeaveGuard ask={dirty && !pending} onSave={() => form.current?.requestSubmit()} />
       <input type="hidden" name="kind" value={kind} />
 
@@ -38,6 +47,8 @@ export function CreateForm({ platform }: { platform: boolean }) {
         caps={{ feed: 'создание', head: 'предмет' }}
         feed={
           <div className="form-column">
+            {state.error ? <p className="frame p-2">Не создалось: {state.error}</p> : null}
+
             <section className="form-section">
               <h2>что создаём</h2>
 

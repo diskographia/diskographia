@@ -1,5 +1,5 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 
 // правила базы (check, unique, триггеры) отвечают человеку словами, а не пятисоткой
 const CONSTRAINT_MESSAGES: Record<string, string> = {
@@ -40,11 +40,18 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
+    const request = host.switchToHttp().getRequest<Request>();
 
     if (exception instanceof HttpException) {
       const body = exception.getResponse();
+      const status = exception.getStatus();
 
-      response.status(exception.getStatus()).json(typeof body === 'string' ? { message: body } : body);
+      // отказ по данным виден в логе с причиной: иначе с боевого не понять, что именно не прошло
+      if (status === HttpStatus.BAD_REQUEST || status === HttpStatus.CONFLICT || status === HttpStatus.FORBIDDEN) {
+        this.logger.warn(`${status} ${request.method} ${request.originalUrl}: ${JSON.stringify(body)}`);
+      }
+
+      response.status(status).json(typeof body === 'string' ? { message: body } : body);
       return;
     }
 
@@ -53,6 +60,7 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
     const translated = isPostgresError(cause) ? translate(cause) : null;
 
     if (translated) {
+      this.logger.warn(`${translated.status} ${request.method} ${request.originalUrl}: ${translated.message}`);
       response.status(translated.status).json({ message: translated.message });
       return;
     }
