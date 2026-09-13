@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# первый запуск на чистом сервере: в папке стенда лежат docker-compose.yml, .env.production и deploy/
+# первый запуск на чистом сервере: в папке стенда лежат docker-compose.yml, .env.production, deploy/
+# и архив образов images.tar.gz, который привозит github actions (или scp руками)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -17,12 +18,11 @@ set +a
 UPLOADS="${UPLOADS_HOST_DIR:-./uploads}"
 mkdir -p "$UPLOADS"
 
-# пакеты в ghcr закрытые: нужен токен github с read:packages в GHCR_USER и GHCR_TOKEN
-if [ -n "${GHCR_TOKEN:-}" ]; then
-  echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-github}" --password-stdin
+if [ -f images.tar.gz ]; then
+  docker load -i images.tar.gz
+  rm images.tar.gz
 fi
 
-docker compose --env-file .env.production pull
 docker compose --env-file .env.production up -d postgres
 docker compose --env-file .env.production run --rm server pnpm db:migrate
 docker compose --env-file .env.production run --rm server pnpm seed:admin
