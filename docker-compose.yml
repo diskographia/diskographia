@@ -14,10 +14,10 @@ services:
       timeout: 5s
       retries: 20
 
-  # образы собирает github actions и кладёт в ghcr.io, на сервере они только тянутся.
+  # образы собирает github actions и привозит на сервер архивом, deploy.sh их загружает.
   # IMAGE_TAG в .env.production: latest либо sha-<коммит> для отката
   server:
-    image: ${IMAGE_PREFIX:-ghcr.io/diskographia}/diskographia-server:${IMAGE_TAG:-latest}
+    image: diskographia-server:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file: .env.production
     environment:
@@ -38,7 +38,7 @@ services:
         condition: service_healthy
 
   client:
-    image: ${IMAGE_PREFIX:-ghcr.io/diskographia}/diskographia-client:${IMAGE_TAG:-latest}
+    image: diskographia-client:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       # серверные запросы клиента идут к серверу по сети compose, а не через caddy и интернет

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ручная кнопка выкатки: запускается на сервере из папки стенда, репозиторий на сервере не нужен.
-# образы собирает github actions на каждый коммит в main и кладёт в ghcr.io, здесь они только тянутся
+# выкатка на сервере из папки стенда. образы привозит github actions архивом images.tar.gz рядом с этим скриптом,
+# руками тот же архив можно привезти scp. в интернет за образами сервер не ходит
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -10,7 +10,7 @@ if [ ! -f .env.production ]; then
   exit 1
 fi
 
-# тег аргументом: sha-<коммит> возвращает прошлую версию, без аргумента берётся свежий latest
+# тег аргументом: sha-<коммит> возвращает прошлую версию из уже загруженных образов, без аргумента latest
 TAG="${1:-latest}"
 
 if grep -qE '^IMAGE_TAG=' .env.production; then
@@ -24,29 +24,15 @@ SERVER_PORT="${SERVER_PORT:-4000}"
 
 WAS=$(docker compose --env-file .env.production images server --format '{{.Tag}}' 2>/dev/null | head -1 || true)
 
-# до ghcr.io с сервера доходит не с первого раза: соединение отваливается на syn, поэтому повторяем
-retry() {
-  local n=0
-  until "$@"; do
-    n=$((n + 1))
-    if [ "$n" -ge 6 ]; then
-      return 1
-    fi
-    echo "не вышло, попытка $n из 6"
-    sleep 5
-  done
-}
-
-# пакеты в ghcr закрытые: actions передаёт временный токен, руками нужен токен github с read:packages
-if [ -n "${GHCR_TOKEN:-}" ]; then
-  retry sh -c 'echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-github}" --password-stdin'
+if [ -f images.tar.gz ]; then
+  echo "== загружаем образы из архива =="
+  docker load -i images.tar.gz
+  rm images.tar.gz
 fi
 
-echo "== тянем образы $TAG =="
-retry docker compose --env-file .env.production pull
-
-if [ -n "${GHCR_TOKEN:-}" ]; then
-  docker logout ghcr.io >/dev/null
+if ! docker image inspect "diskographia-server:$TAG" "diskographia-client:$TAG" >/dev/null 2>&1; then
+  echo "образов с тегом $TAG на сервере нет: их привозит выкатка из github actions"
+  exit 1
 fi
 
 echo "== копия базы и файлов перед миграциями =="
@@ -62,7 +48,8 @@ docker compose --env-file .env.production up -d --remove-orphans
 echo "== ждём ответа =="
 for _ in $(seq 1 45); do
   if curl -fsS -o /dev/null "http://127.0.0.1:$SERVER_PORT/api/health"; then
-    docker image prune -f >/dev/null
+    # старые образы живут месяц для отката, потом уходят
+    docker image prune -af --filter "until=720h" >/dev/null
     echo "выкатили $TAG, прошлая была ${WAS:-неизвестна}"
     echo "caddy трогать не нужно: адреса и порты не менялись"
     exit 0
