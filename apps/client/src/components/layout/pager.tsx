@@ -63,6 +63,16 @@ export function Pager({ children }: { children: ReactNode }) {
     });
     changes.observe(inner, { childList: true, subtree: true, characterData: true, attributes: true });
 
+    // нажатие мышью ставит фокус на то, что уже видно: страницу не трогаем, иначе разбитые по колонкам
+    // блоки отдают координаты первой колонки и экран прыгает назад. страницу ищем только для фокуса с клавиатуры
+    let pointer = 0;
+
+    const onPointer = () => {
+      pointer = window.setTimeout(() => {
+        pointer = 0;
+      }, 400);
+    };
+
     // браузер сам прокручивает спрятанное переполнение к фокусу: возвращаем и показываем нужную страницу
     const onFocus = (event: FocusEvent) => {
       const target = event.target as HTMLElement | null;
@@ -71,9 +81,22 @@ export function Pager({ children }: { children: ReactNode }) {
         return;
       }
 
-      const shift = target.getBoundingClientRect().left - inner.getBoundingClientRect().left;
-
       outer.scrollLeft = 0;
+
+      if (pointer) {
+        return;
+      }
+
+      const box = target.getBoundingClientRect();
+      const frame = outer.getBoundingClientRect();
+
+      // уже на экране: ничего не листаем
+      if (box.left >= frame.left - 1 && box.right <= frame.right + 1) {
+        return;
+      }
+
+      const shift = box.left - inner.getBoundingClientRect().left;
+
       setPage(Math.max(0, Math.min(pages - 1, Math.floor(shift / (width + GAP)))));
     };
 
@@ -83,6 +106,7 @@ export function Pager({ children }: { children: ReactNode }) {
       }
     };
 
+    outer.addEventListener('pointerdown', onPointer, true);
     outer.addEventListener('focusin', onFocus);
     outer.addEventListener('scroll', onScroll);
 
@@ -91,8 +115,10 @@ export function Pager({ children }: { children: ReactNode }) {
     return () => {
       watcher.disconnect();
       changes.disconnect();
+      outer.removeEventListener('pointerdown', onPointer, true);
       outer.removeEventListener('focusin', onFocus);
       outer.removeEventListener('scroll', onScroll);
+      window.clearTimeout(pointer);
       window.clearTimeout(later);
     };
   }, [measure, width, pages]);
