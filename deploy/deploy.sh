@@ -24,13 +24,26 @@ SERVER_PORT="${SERVER_PORT:-4000}"
 
 WAS=$(docker compose --env-file .env.production images server --format '{{.Tag}}' 2>/dev/null | head -1 || true)
 
+# до ghcr.io с сервера доходит не с первого раза: соединение отваливается на syn, поэтому повторяем
+retry() {
+  local n=0
+  until "$@"; do
+    n=$((n + 1))
+    if [ "$n" -ge 6 ]; then
+      return 1
+    fi
+    echo "не вышло, попытка $n из 6"
+    sleep 5
+  done
+}
+
 # пакеты в ghcr закрытые: actions передаёт временный токен, руками нужен токен github с read:packages
 if [ -n "${GHCR_TOKEN:-}" ]; then
-  echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-github}" --password-stdin
+  retry sh -c 'echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-github}" --password-stdin'
 fi
 
 echo "== тянем образы $TAG =="
-docker compose --env-file .env.production pull
+retry docker compose --env-file .env.production pull
 
 if [ -n "${GHCR_TOKEN:-}" ]; then
   docker logout ghcr.io >/dev/null
