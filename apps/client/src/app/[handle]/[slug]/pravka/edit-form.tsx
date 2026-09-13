@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { startTransition, useActionState, useRef } from 'react';
+import { startTransition, useActionState, useRef, useState } from 'react';
 
 import type { ChildLink, EntityCard, EntityDetail, MediaItem, ScheduleEntry } from '@/api/types';
 import { ApplicationsManager } from '@/components/entity/applications-manager';
@@ -20,6 +20,7 @@ import { MediaManager } from '@/components/media/media-manager';
 import { Hint } from '@/components/ui/hint';
 import { AsciiNote } from '@/components/world/ascii';
 import { Here } from '@/components/world/here';
+import { checkForm, focusIssue, type FormIssue } from '@/components/entity/form-check';
 import { LeaveGuard } from '@/components/world/leave-guard';
 import { useDirty } from '@/components/world/use-dirty';
 import { platformRole } from '@/platform';
@@ -45,6 +46,7 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntity, { error: null, savedAt: null });
   const form = useRef<HTMLFormElement>(null);
   const { dirty } = useDirty(form, state.savedAt);
+  const [issues, setIssues] = useState<FormIssue[]>([]);
   const viewPath = routes.entity(handle, entity.slug);
   const container = entity.kind === 'event' || entity.kind === 'capsule';
   const role = platformRole(handle, entity.slug);
@@ -56,6 +58,15 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
       onSubmit={(event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
+        const found = checkForm(data, entity.kind, 'update');
+
+        setIssues(found);
+
+        if (found.length > 0) {
+          focusIssue(form.current, found);
+          return;
+        }
+
         startTransition(() => action(data));
       }}
       onKeyDown={keepEnter}
@@ -73,7 +84,17 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
         caps={{ feed: 'правка', head: 'предмет', meta: 'действия' }}
         feed={
           <div className="form-column">
-            {state.error ? <p className="frame p-2">Не сохранилось: {state.error}</p> : null}
+            {issues.length > 0 ? (
+              <div className="frame p-2">
+                <p>Так сохранить нельзя, поправьте:</p>
+                <ul>
+                  {issues.map((issue) => (
+                    <li key={issue.field + issue.message}>{issue.message}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {state.error && issues.length === 0 ? <p className="frame p-2">Не сохранилось: {state.error}</p> : null}
 
             <section className="form-section">
               <h2>паспорт</h2>

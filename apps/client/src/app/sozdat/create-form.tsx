@@ -4,6 +4,7 @@ import { startTransition, useActionState, useRef, useState } from 'react';
 
 import type { EntityKind } from '@/api/types';
 import { DetailFields, IdentityFields } from '@/components/entity/entity-fields';
+import { checkForm, focusIssue, type FormIssue } from '@/components/entity/form-check';
 import { keepEnter } from '@/components/entity/keep-enter';
 import { MarkdownEditor } from '@/components/entity/markdown-editor';
 import { ModuleLayout } from '@/components/layout/module-layout';
@@ -28,6 +29,7 @@ export function CreateForm({ platform }: { platform: boolean }) {
   const chosen = KINDS.find((item) => item.value === kind)!;
   const form = useRef<HTMLFormElement>(null);
   const { dirty } = useDirty(form, null);
+  const [issues, setIssues] = useState<FormIssue[]>([]);
 
   return (
     <form
@@ -35,6 +37,15 @@ export function CreateForm({ platform }: { platform: boolean }) {
       onSubmit={(event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
+        const found = checkForm(data, kind, 'create');
+
+        setIssues(found);
+
+        if (found.length > 0) {
+          focusIssue(form.current, found);
+          return;
+        }
+
         startTransition(() => action(data));
       }}
       onKeyDown={keepEnter}
@@ -47,7 +58,17 @@ export function CreateForm({ platform }: { platform: boolean }) {
         caps={{ feed: 'создание', head: 'предмет' }}
         feed={
           <div className="form-column">
-            {state.error ? <p className="frame p-2">Не создалось: {state.error}</p> : null}
+            {issues.length > 0 ? (
+              <div className="frame p-2">
+                <p>Так создать нельзя, поправьте:</p>
+                <ul>
+                  {issues.map((issue) => (
+                    <li key={issue.field + issue.message}>{issue.message}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {state.error && issues.length === 0 ? <p className="frame p-2">Не создалось: {state.error}</p> : null}
 
             <section className="form-section">
               <h2>что создаём</h2>
