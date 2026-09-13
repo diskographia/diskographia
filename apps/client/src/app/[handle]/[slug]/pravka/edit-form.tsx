@@ -43,6 +43,22 @@ interface EditFormProps {
 
 const AUTOSAVE_MS = 2500;
 
+// что уже приложено: коротко, в углу экрана показа
+function mediaSummary(media: MediaItem[]): string {
+  const count = (kinds: string[]) => media.filter((item) => kinds.includes(item.media.kind)).length;
+  const parts = [
+    [count(['image']), 'фото'],
+    [count(['video', 'embed']), 'видео'],
+    [count(['audio']), 'треков'],
+    [count(['model', 'file']), 'файлов'],
+  ] as const;
+
+  return parts
+    .filter(([n]) => n > 0)
+    .map(([n, word]) => `${n} ${word}`)
+    .join(', ');
+}
+
 // все поля живут в большом левом экране одной колонкой, маленькие экраны держат кнопки и подсказки
 export function EditForm({ entity, handle, cover, media, nested, owned, canPin, owner, platform, schedule }: EditFormProps) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntity, { error: null, savedAt: null });
@@ -120,7 +136,7 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
           <div className="form-column">
             {issues.length > 0 ? (
               <div className="frame p-2">
-                <p>Так сохранить нельзя, поправьте:</p>
+                <p>Проверьте поля:</p>
                 <ul>
                   {issues.map((issue) => (
                     <li key={issue.field + issue.message}>{issue.message}</li>
@@ -128,7 +144,7 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
                 </ul>
               </div>
             ) : null}
-            {state.error && issues.length === 0 ? <p className="frame p-2">Не сохранилось: {state.error}</p> : null}
+            {state.error && issues.length === 0 ? <p className="frame p-2">Не удалось сохранить: {state.error}</p> : null}
 
             <section className="form-section">
               <h2>паспорт</h2>
@@ -156,6 +172,7 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
             <span className="queue-tools">
               <MediaManager entityId={entity.id} media={media} label={global ? 'очереди' : 'медиа'} />
             </span>
+            {media.length > 0 ? <span className="tape-name">{mediaSummary(media)}</span> : null}
           </MediaDrop>
         }
         head={
@@ -174,7 +191,7 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
             {state.error ? <p className="mt-1">Ошибка: {state.error}</p> : null}
             {state.savedAt && !dirty ? <p className="mt-1">Сохранено.</p> : null}
             {dirty ? <p className="hint mt-1">Есть несохранённые правки.</p> : null}
-            {entity.visibility === 'draft' ? <Hint>Черновик сохраняется сам, пока остаётся черновиком.</Hint> : null}
+            {entity.visibility === 'draft' ? <Hint>Черновик сохраняется автоматически.</Hint> : null}
           </div>
         }
         meta={

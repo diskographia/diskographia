@@ -92,7 +92,7 @@ export function CreateForm({ platform }: { platform: boolean }) {
           <div className="form-column">
             {issues.length > 0 ? (
               <div className="frame p-2">
-                <p>Так создать нельзя, поправьте:</p>
+                <p>Проверьте поля:</p>
                 <ul>
                   {issues.map((issue) => (
                     <li key={issue.field + issue.message}>{issue.message}</li>
@@ -100,7 +100,7 @@ export function CreateForm({ platform }: { platform: boolean }) {
                 </ul>
               </div>
             ) : null}
-            {state.error && issues.length === 0 ? <p className="frame p-2">Не создалось: {state.error}</p> : null}
+            {state.error && issues.length === 0 ? <p className="frame p-2">Не удалось создать: {state.error}</p> : null}
 
             <section className="form-section">
               <h2>что создаём</h2>
@@ -161,7 +161,7 @@ export function CreateForm({ platform }: { platform: boolean }) {
             {state.error ? <p className="mt-1">Ошибка: {state.error}</p> : null}
           </div>
         }
-        meta={<Hint>Вложенное и расписание добавляются сразу после создания, в правке. Файлы можно приложить уже здесь.</Hint>}
+        meta={<Hint>Файлы можно приложить сразу. Вложенное и расписание появятся в правке после создания.</Hint>}
         text={
           <div>
             <p>Предмет появится среди ваших с видимостью «черновик».</p>

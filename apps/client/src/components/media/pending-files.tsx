@@ -44,7 +44,7 @@ export function PendingFiles({ files, onChange }: PendingFilesProps) {
       }}
     >
       {files.length === 0 ? (
-        <p className="hint">Перетащите сюда картинки, звук, видео или модель, либо выберите кнопкой. Первое фото станет обложкой.</p>
+        <p className="hint">Перетащите файлы сюда или нажмите «+ файл». Первое фото станет обложкой.</p>
       ) : (
         <ul>
           {files.map((file, index) => (

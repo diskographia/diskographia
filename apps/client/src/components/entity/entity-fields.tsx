@@ -66,9 +66,10 @@ export function DetailFields({ kind, entity, platform = false }: EntityFieldsPro
       {kind === 'event' ? (
         <fieldset className="frame mt-2 p-2">
           <legend>ивент</legend>
-          <DateTimeInput name="starts" label="начало: пусто значит сейчас, время можно не указывать" value={entity?.event?.startsAt} />
-          <DateTimeInput name="ends" label="конец, не обязательно" value={entity?.event?.endsAt} />
-          <DateTimeInput name="announce" label="анонс с этого момента, не позже начала" value={entity?.event?.announceAt} />
+          <DateTimeInput name="starts" label="начало" value={entity?.event?.startsAt} />
+          <DateTimeInput name="ends" label="конец" value={entity?.event?.endsAt} />
+          <DateTimeInput name="announce" label="анонс с" value={entity?.event?.announceAt} />
+          <p className="hint mt-1">Без даты начала ивент начнётся сейчас. Время можно не указывать; конец по умолчанию в тот же день.</p>
           <label className="mt-2 block">
             текст анонса, показывается до начала
             <textarea

@@ -103,7 +103,7 @@ export function TagsInput({ initial }: { initial: string }) {
             }
           }}
           onBlur={() => add(draft)}
-          placeholder={tags.length === 0 ? 'набирайте тег, enter или запятая добавляет' : ''}
+          placeholder={tags.length === 0 ? 'добавить тег' : ''}
           aria-label="новый тег"
           className="min-w-32 flex-1 border-0 bg-transparent p-1 outline-none"
         />
@@ -118,7 +118,7 @@ export function TagsInput({ initial }: { initial: string }) {
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => add(facet.name)}
               className="frame px-1 text-[0.9em]"
-              title={facet.total > 0 ? `предметов с тегом: ${facet.total}` : 'тег уже есть на платформе'}
+              title={facet.total > 0 ? `предметов: ${facet.total}` : undefined}
             >
               #{facet.name}
             </button>
