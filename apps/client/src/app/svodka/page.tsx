@@ -1,43 +1,15 @@
-import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
-import { apiGet } from '@/api/client';
-import { authHeaders } from '@/api/session';
+import { apiGet } from '@/api/server';
+import type { AdminSummary } from '@/api/types';
 import { currentViewer } from '@/api/viewer';
+import { kindLabel, visibilityLabel } from '@/components/entity/labels';
 import { ListScreen } from '@/components/layout/list-screen';
 import { routes } from '@/routes';
 
-interface Summary {
-  byKind: { kind: string; visibility: string; total: number }[];
-  totals: {
-    profiles: number;
-    entities: number;
-    deleted: number;
-    files: number;
-    bytes: string;
-    views: number;
-    feedback: number;
-  };
-  popular: { title: string; handle: string; slug: string; viewer_count: number; feedback_count: number }[];
-  pendingApplications: number;
-}
-
-const KIND: Record<string, string> = {
-  event: 'ивент',
-  capsule: 'капсула',
-  content: 'контент',
-  product: 'товар',
-};
-
-const VISIBILITY: Record<string, string> = {
-  draft: 'черновик',
-  private: 'только автор',
-  unlisted: 'по ссылке',
-  public: 'публичный',
-};
-
-function megabytes(bytes: string): string {
-  return `${(Number(bytes) / 1024 / 1024).toFixed(1)} МБ`;
+function megabytes(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
 }
 
 export default async function SummaryPage() {
@@ -47,7 +19,7 @@ export default async function SummaryPage() {
     notFound();
   }
 
-  const summary = await apiGet<Summary>('/admin/summary', { headers: await authHeaders() }).catch(() => null);
+  const summary = await apiGet<AdminSummary>('/admin/summary').catch(() => null);
 
   if (!summary) {
     notFound();
@@ -63,7 +35,7 @@ export default async function SummaryPage() {
           <div className="flex flex-wrap gap-2">
             {[
               ['профилей', totals.profiles],
-              ['объектов', totals.entities],
+              ['предметов', totals.entities],
               ['удалённых', totals.deleted],
               ['файлов', `${totals.files}, ${megabytes(totals.bytes)}`],
               ['заходов', totals.views],
@@ -77,14 +49,14 @@ export default async function SummaryPage() {
             ))}
           </div>
 
-          <h2 className="mt-4">объекты по видам</h2>
+          <h2 className="mt-4">предметы по видам</h2>
           <div className="mt-2 overflow-x-auto">
             <table className="frame">
               <tbody>
                 {summary.byKind.map((row) => (
                   <tr key={`${row.kind}-${row.visibility}`}>
-                    <td className="frame px-2">{KIND[row.kind] ?? row.kind}</td>
-                    <td className="frame px-2">{VISIBILITY[row.visibility] ?? row.visibility}</td>
+                    <td className="frame px-2">{kindLabel(row.kind)}</td>
+                    <td className="frame px-2">{visibilityLabel(row.visibility)}</td>
                     <td className="frame px-2">{row.total}</td>
                   </tr>
                 ))}
@@ -95,13 +67,13 @@ export default async function SummaryPage() {
       }
       info={
         <div>
-          <p>заявок ждут решения: {summary.pendingApplications}</p>
+          <p>Заявок ждут решения: {summary.pendingApplications}.</p>
           <p className="mt-2">
             <Link href={routes.home()} className="underline">
               настройка главной
             </Link>
           </p>
-          <span className="hint">подборка, витрина и манифест правятся кнопкой на самой главной</span>
+          <span className="hint">Подборка, витрина и манифест правятся кнопкой на самой главной.</span>
         </div>
       }
       text={
@@ -114,13 +86,13 @@ export default async function SummaryPage() {
                   {row.title}
                 </Link>
                 <span className="hint">
-                  заходов {row.viewer_count}, откликов {row.feedback_count}
+                  заходов {row.viewerCount}, откликов {row.feedbackCount}
                 </span>
               </li>
             ))}
           </ol>
 
-          {summary.popular.length === 0 ? <p>объектов пока нет</p> : null}
+          {summary.popular.length === 0 ? <p>Предметов пока нет.</p> : null}
         </div>
       }
     />

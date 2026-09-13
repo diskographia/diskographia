@@ -1,11 +1,30 @@
 import type { EntityKind } from '@/api/types';
 
+// datetime-local отдаёт местное время без пояса, пустое поле значит «нет даты»
+function isoOrNull(value: FormDataEntryValue | null): string | null {
+  const text = String(value ?? '').trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const moment = new Date(text);
+
+  return Number.isNaN(moment.getTime()) ? null : moment.toISOString();
+}
+
+function numberOrNull(value: FormDataEntryValue | null): number | null {
+  const text = String(value ?? '').trim();
+
+  return text ? Number(text.replace(',', '.')) : null;
+}
+
 // одно преобразование формы на создание и на правку
 export function entityPayload(form: FormData, kind: EntityKind): Record<string, unknown> {
   const payload: Record<string, unknown> = {
-    title: String(form.get('title')),
+    title: String(form.get('title') ?? '').trim(),
     descriptionMd: String(form.get('descriptionMd') ?? ''),
-    visibility: String(form.get('visibility')),
+    visibility: String(form.get('visibility') ?? 'draft'),
     tags: String(form.get('tags') ?? '')
       .split(',')
       .map((tag) => tag.trim())
@@ -24,14 +43,14 @@ export function entityPayload(form: FormData, kind: EntityKind): Record<string, 
 
   if (kind === 'event') {
     payload.event = {
-      startsAt: new Date(String(form.get('startsAt'))).toISOString(),
-      endsAt: form.get('endsAt') ? new Date(String(form.get('endsAt'))).toISOString() : null,
-      announceAt: form.get('announceAt') ? new Date(String(form.get('announceAt'))).toISOString() : null,
+      startsAt: isoOrNull(form.get('startsAt')) ?? '',
+      endsAt: isoOrNull(form.get('endsAt')),
+      announceAt: isoOrNull(form.get('announceAt')),
       announceMd: String(form.get('announceMd') ?? ''),
-      location: String(form.get('location') ?? '') || null,
-      city: String(form.get('city') ?? '') || null,
-      latitude: String(form.get('latitude') ?? '').trim() ? Number(form.get('latitude')) : null,
-      longitude: String(form.get('longitude') ?? '').trim() ? Number(form.get('longitude')) : null,
+      location: String(form.get('location') ?? '').trim() || null,
+      city: String(form.get('city') ?? '').trim() || null,
+      latitude: numberOrNull(form.get('latitude')),
+      longitude: numberOrNull(form.get('longitude')),
       isGlobal: form.get('isGlobal') === 'on',
       lingerDays: Number(form.get('lingerDays') ?? 0),
       applicationsOpen: form.get('applicationsOpen') === 'on',
@@ -45,10 +64,10 @@ export function entityPayload(form: FormData, kind: EntityKind): Record<string, 
     const byWords = amount.length === 0;
 
     payload.product = {
-      priceAmount: byWords ? null : Number(amount),
-      priceCurrency: byWords ? null : String(form.get('priceCurrency') ?? '').toUpperCase(),
+      priceAmount: byWords ? null : Number(amount.replace(',', '.')),
+      priceCurrency: byWords ? null : String(form.get('priceCurrency') ?? '').trim().toUpperCase(),
       priceLabel: byWords ? String(form.get('priceLabel') ?? '').trim() : null,
-      contacts: String(form.get('contacts') ?? ''),
+      contacts: String(form.get('contacts') ?? '').trim(),
     };
   }
 

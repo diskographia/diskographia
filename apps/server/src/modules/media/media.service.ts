@@ -2,6 +2,7 @@ import type { Readable } from 'node:stream';
 
 import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
+import { fileTypeFromFile } from 'file-type';
 import { parseFile } from 'music-metadata';
 import sharp from 'sharp';
 
@@ -11,9 +12,22 @@ import { entities, entityMedia, files } from '../../database/schema/index.js';
 import { AccessService } from '../access/access.service.js';
 import { StorageService } from './storage.service.js';
 
+// имена типов такие, какими их называет file-type по содержимому
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif']);
-const AUDIO_TYPES = new Set(['audio/mpeg', 'audio/flac', 'audio/wav', 'audio/ogg']);
-const VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
+const AUDIO_TYPES = new Set([
+  'audio/mpeg',
+  'audio/flac',
+  'audio/x-flac',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/vnd.wave',
+  'audio/ogg',
+  'audio/opus',
+  'audio/aac',
+  'audio/mp4',
+  'audio/x-m4a',
+]);
+const VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska']);
 const MODEL_TYPES = new Set(['model/gltf-binary', 'model/gltf+json']);
 const MODEL_EXTENSIONS = ['.glb', '.gltf'];
 
@@ -30,10 +44,14 @@ export class MediaService {
     private readonly access: AccessService,
   ) {}
 
-  async attach(entityId: string, actorId: string, source: Readable, originalName: string, mimeType: string) {
+  async attach(entityId: string, actorId: string, source: Readable, originalName: string, declaredType: string) {
     await this.requireOwned(entityId, actorId);
 
-    const stored = await this.storage.store(source, originalName);
+    const stored = await this.storage.store(source, originalName, (sha256) => this.pathBySha(sha256));
+
+    // тип берётся из содержимого, заголовок запроса только подсказка для текстовых файлов
+    const sniffed = await fileTypeFromFile(this.storage.absolutePath(stored.path)).catch(() => undefined);
+    const mimeType = sniffed?.mime ?? (declaredType.startsWith('text/') ? declaredType : 'application/octet-stream');
     const kind = this.detectKind(mimeType, originalName);
 
     const dimensions = kind === 'image' ? await this.measureImage(stored.path) : null;
@@ -57,8 +75,8 @@ export class MediaService {
       throw new BadRequestException('файл не сохранился');
     }
 
-    if (kind === 'image' && !stored.reused) {
-      await this.buildPreview(stored.path, stored.sha256);
+    if (kind === 'image') {
+      await this.ensurePreview(stored.path, stored.sha256);
     }
 
     const [attached] = await this.db
@@ -108,7 +126,7 @@ export class MediaService {
     return attached;
   }
 
-  // порядок задаёт очереди на главной: трансляции идут первыми, фото и объекты следом
+  // порядок задаёт очереди на главной: трансляции идут первыми, фото и предметы следом
   async reorder(entityId: string, actorId: string, ids: string[]) {
     await this.requireOwned(entityId, actorId);
 
@@ -120,7 +138,7 @@ export class MediaService {
     const known = new Set(rows.map((row) => row.id));
 
     if (ids.length !== known.size || ids.some((id) => !known.has(id))) {
-      throw new BadRequestException('в порядке должны быть перечислены все медиа объекта, по одному разу');
+      throw new BadRequestException('в порядке должны быть перечислены все медиа предмета, по одному разу');
     }
 
     await this.db.transaction(async (tx) => {
@@ -175,7 +193,7 @@ export class MediaService {
     }
   }
 
-  // браузеры часто отдают glb как поток байтов, поэтому смотрим и на расширение
+  // glb по содержимому определяется не всегда, поэтому смотрим и на расширение
   private detectKind(mimeType: string, originalName: string): MediaKind {
     if (IMAGE_TYPES.has(mimeType)) return 'image';
     if (AUDIO_TYPES.has(mimeType)) return 'audio';
@@ -200,16 +218,30 @@ export class MediaService {
     }
   }
 
-  private async buildPreview(relativePath: string, sha256: string): Promise<void> {
+  // одинаковое содержимое уже лежало под другим именем или в другом месяце: путь берётся из базы
+  private async pathBySha(sha256: string): Promise<string | null> {
+    const [row] = await this.db.select({ path: files.path }).from(files).where(eq(files.sha256, sha256)).limit(1);
+
+    return row?.path ?? null;
+  }
+
+  // превью не критично для загрузки, но без него плитка пустая, поэтому недостающее достраивается
+  private async ensurePreview(relativePath: string, sha256: string): Promise<void> {
+    const derivative = this.storage.derivativePath(sha256, 'preview', '.webp');
+
+    if (await this.storage.exists(derivative)) {
+      return;
+    }
+
     try {
       const preview = await sharp(this.storage.absolutePath(relativePath))
         .resize({ width: this.env.PREVIEW_WIDTH, withoutEnlargement: true })
         .webp({ quality: this.env.PREVIEW_QUALITY })
         .toBuffer();
 
-      await this.storage.writeDerivative(this.storage.derivativePath(sha256, 'preview', '.webp'), preview);
-    } catch {
-      // превью не критично: оригинал уже сохранён, пересоздать можно пакетно
+      await this.storage.writeDerivative(derivative, preview);
+    } catch (failure) {
+      this.logger.warn(`превью для ${relativePath} не построилось: ${String(failure)}`);
     }
   }
 
@@ -224,7 +256,7 @@ export class MediaService {
 
   private async requireOwned(entityId: string, actorId: string) {
     if (!(await this.access.can(entityId, actorId, 'edit'))) {
-      throw new ForbiddenException('нет права менять медиа этого объекта');
+      throw new ForbiddenException('нет права менять медиа этого предмета');
     }
   }
 }

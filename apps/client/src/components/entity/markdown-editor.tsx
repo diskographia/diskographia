@@ -22,14 +22,18 @@ interface Insert {
   hotkey?: string;
 }
 
+// на ctrl только буквы, которые браузер не держит за собой
 const INSERTS: Insert[] = [
   { label: 'заголовок', before: '## ', after: '', placeholder: 'заголовок' },
-  { label: 'жирный', before: '**', after: '**', placeholder: 'текст' },
-  { label: 'курсив', before: '_', after: '_', placeholder: 'текст' },
+  { label: 'жирный', before: '**', after: '**', placeholder: 'текст', hotkey: 'b' },
+  { label: 'курсив', before: '_', after: '_', placeholder: 'текст', hotkey: 'i' },
+  { label: 'зачёркнутый', before: '~~', after: '~~', placeholder: 'текст' },
   { label: 'список', before: '- ', after: '', placeholder: 'пункт' },
+  { label: 'нумерованный', before: '1. ', after: '', placeholder: 'пункт' },
   { label: 'цитата', before: '> ', after: '', placeholder: 'цитата' },
-  { label: 'ссылка', before: '[', after: '](https://)', placeholder: 'подпись' },
-  { label: 'код', before: '`', after: '`', placeholder: 'код' },
+  { label: 'ссылка', before: '[', after: '](https://)', placeholder: 'подпись', hotkey: 'k' },
+  { label: 'код', before: '`', after: '`', placeholder: 'код', hotkey: 'e' },
+  { label: 'таблица', before: '\n| колонка | колонка |\n| --- | --- |\n| ', after: ' | ячейка |\n', placeholder: 'ячейка' },
   { label: 'черта', before: '\n---\n', after: '', placeholder: '' },
 ];
 
@@ -78,7 +82,7 @@ export function MarkdownEditor({ name, label, initial, media = [], rows = 12 }: 
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="editor-shell">
       <div className="mb-1 flex flex-wrap items-center gap-1">
         <span className="mr-1">{label}</span>
 
@@ -99,7 +103,13 @@ export function MarkdownEditor({ name, label, initial, media = [], rows = 12 }: 
         {preview
           ? null
           : media.map((item, index) => (
-              <button key={item.media.id} type="button" onClick={() => putMedia(index)} className="frame px-1">
+              <button
+                key={item.media.id}
+                type="button"
+                onClick={() => putMedia(index)}
+                title={item.media.title ?? undefined}
+                className="frame px-1"
+              >
                 медиа {index + 1}
               </button>
             ))}
@@ -109,7 +119,7 @@ export function MarkdownEditor({ name, label, initial, media = [], rows = 12 }: 
         </button>
       </div>
 
-      <div className="editor min-h-0 flex-1" data-preview={preview ? 'on' : 'off'}>
+      <div className="editor" data-preview={preview ? 'on' : 'off'}>
         <textarea
           ref={area}
           name={name}
@@ -127,8 +137,8 @@ export function MarkdownEditor({ name, label, initial, media = [], rows = 12 }: 
 
       <p className="hint mt-1">
         {media.length > 0
-          ? 'кнопка «медиа N» ставит файл прямо в это место текста, разметка обычная markdown'
-          : 'разметка обычная markdown. прикрепите медиа, и появятся кнопки, чтобы вставить их в текст'}
+          ? 'Кнопка «медиа N» ставит файл прямо в это место текста, разметка обычная markdown.'
+          : 'Разметка обычная markdown. Прикрепите медиа, и появятся кнопки, чтобы вставить их в текст.'}
       </p>
     </div>
   );

@@ -2,9 +2,11 @@ import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 
 import { ZodValidationPipe } from '../../validation/zod-validation.pipe.js';
+import { AccessService } from '../access/access.service.js';
 import { AuthGuard } from '../identity/auth.guard.js';
-import { CurrentIdentity } from '../identity/current-identity.decorator.js';
+import { CurrentIdentity, ViewerId } from '../identity/current-identity.decorator.js';
 import type { Identity } from '../identity/identity.service.js';
+import { OptionalAuthGuard } from '../identity/optional-auth.guard.js';
 import { ParticipationService } from './participation.service.js';
 
 const attendingSchema = z.object({ attending: z.boolean() });
@@ -13,10 +15,16 @@ const resolveSchema = z.object({ accept: z.boolean(), withWork: z.boolean().defa
 
 @Controller('events')
 export class ParticipationController {
-  constructor(private readonly participation: ParticipationService) {}
+  constructor(
+    private readonly participation: ParticipationService,
+    private readonly access: AccessService,
+  ) {}
 
   @Get(':id/people')
-  people(@Param('id') id: string) {
+  @UseGuards(OptionalAuthGuard)
+  async people(@ViewerId() viewerId: string | null, @Param('id') id: string) {
+    await this.access.readable(id, viewerId);
+
     return this.participation.people(id);
   }
 

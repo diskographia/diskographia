@@ -1,6 +1,8 @@
 import sharp from 'sharp';
 
-const file = "D:/diskographia/сурсы/рамка-модуль.png";
+// видимая рамка модуля в долях холста: node tools/measure/frame.mjs сурсы/рамка-модуль.png
+
+const file = process.argv[2];
 const meta = await sharp(file).metadata();
 const { data, info } = await sharp(file).resize({ width: 400, fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 

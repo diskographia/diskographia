@@ -1,5 +1,4 @@
-import { apiGet } from '@/api/client';
-import { authHeaders } from '@/api/session';
+import { apiGet } from '@/api/server';
 import { requireService } from '@/api/viewer';
 import { routes } from '@/routes';
 
@@ -13,16 +12,14 @@ export async function AdminBar() {
     return null;
   }
 
-  const unread = await apiGet<{ total: number }>('/notifications/unread', { headers: await authHeaders() }).catch(
-    () => ({ total: 0 }),
-  );
+  const unread = await apiGet<{ total: number }>('/notifications/unread').catch(() => ({ total: 0 }));
 
   const groups: NavGroup[] = [
     {
       label: 'моё',
       links: [
         { href: routes.home(), label: 'главная' },
-        { href: routes.mine(), label: 'объекты' },
+        { href: routes.mine(), label: 'предметы' },
         { href: routes.create(), label: 'создать' },
         { href: routes.inbox(), label: unread.total > 0 ? `уведомления (${unread.total})` : 'уведомления' },
         { href: routes.applications(), label: 'заявки' },

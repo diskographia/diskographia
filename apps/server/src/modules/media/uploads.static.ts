@@ -9,7 +9,7 @@ const INLINE_EXTENSIONS = new Set([
 
 export const UPLOADS_PREFIX = '/uploads';
 
-// в бою раздаёт nginx, заголовки должны совпадать с его конфигом
+// в бою раздаёт caddy, заголовки должны совпадать с deploy/Caddyfile
 export function setUploadHeaders(response: ServerResponse, path: string): void {
   response.setHeader('X-Content-Type-Options', 'nosniff');
   response.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");

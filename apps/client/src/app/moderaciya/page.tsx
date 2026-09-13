@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation';
 
-import { apiGet } from '@/api/client';
-import { authHeaders } from '@/api/session';
+import { apiGet } from '@/api/server';
+import type { ModerationRow } from '@/api/types';
 import { currentViewer } from '@/api/viewer';
 import { ListScreen } from '@/components/layout/list-screen';
 
-import { ModerationList, type Row } from './moderation-list';
+import { ModerationList } from './moderation-list';
 
 interface PageProps {
   searchParams: Promise<{ deleted?: string }>;
@@ -21,21 +21,19 @@ export default async function ModerationPage({ searchParams }: PageProps) {
   const { deleted } = await searchParams;
   const showDeleted = deleted === 'true';
 
-  const rows = await apiGet<Row[]>(`/admin/objects?deleted=${showDeleted}`, {
-    headers: await authHeaders(),
-  }).catch(() => []);
+  const rows = await apiGet<ModerationRow[]>(`/admin/objects?deleted=${showDeleted}`).catch(() => []);
 
   return (
     <ListScreen
       title={showDeleted ? 'модерация: удалённое' : 'модерация'}
       list={<ModerationList rows={rows} showDeleted={showDeleted} />}
-      info={<p>объектов в списке: {rows.length}</p>}
+      info={<p>Предметов в списке: {rows.length}.</p>}
       text={
         <div>
           <h2>права платформы</h2>
-          <p>Это единственное место, где платформа трогает чужие объекты.</p>
-          <p>«спрятать» ставит видимость «только автор», объект остаётся у автора.</p>
-          <p>«удалить» делает то же, что кнопка автора: объект гаснет, но лежит в удалённом.</p>
+          <p>Это единственное место, где платформа трогает чужие предметы.</p>
+          <p>«Спрятать» ставит видимость «только я», предмет остаётся у автора.</p>
+          <p>«Удалить» делает то же, что кнопка автора: предмет гаснет, но лежит в удалённом.</p>
         </div>
       }
     />

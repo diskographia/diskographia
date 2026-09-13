@@ -1,23 +1,22 @@
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-import { fileUrl, previewUrl } from '@/api/client';
+import { fileUrl, previewUrl } from '@/api/urls';
 import type { MediaItem } from '@/api/types';
+
+import { splitMediaTokens } from './media-token';
 
 interface MarkdownViewProps {
   source: string;
   media?: MediaItem[];
 }
 
-// ![[2]] ставит вторую прикреплённую медиа прямо в это место текста
-const MEDIA_TOKEN = /!\[\[(\d+)\]\]/g;
-
 function MediaSlot({ item }: { item: MediaItem }) {
   if (item.media.kind === 'embed' && item.media.embedUrl) {
     return (
       <figure className="my-3">
-        <a href={item.media.embedUrl} target="_blank" rel="noreferrer">
-          {item.media.embedUrl}
+        <a href={item.media.embedUrl} target="_blank" rel="noreferrer noopener">
+          {item.media.title ?? item.media.embedUrl}
         </a>
       </figure>
     );
@@ -27,25 +26,29 @@ function MediaSlot({ item }: { item: MediaItem }) {
     return null;
   }
 
+  const title = item.media.title ?? '';
+
   if (item.media.kind === 'image') {
     return (
       <figure className="my-3">
-        <img src={previewUrl(item.file.path) ?? ''} alt="" className="w-full" />
+        <img src={previewUrl(item.file.path) ?? ''} alt={title} loading="lazy" className="w-full" />
       </figure>
     );
   }
 
   if (item.media.kind === 'audio') {
-    return <audio controls src={fileUrl(item.file.path) ?? undefined} className="my-3 w-full" />;
+    return <audio controls src={fileUrl(item.file.path) ?? undefined} title={title} className="my-3 w-full" />;
   }
 
   if (item.media.kind === 'video') {
-    return <video controls src={fileUrl(item.file.path) ?? undefined} className="my-3 w-full" />;
+    return <video controls src={fileUrl(item.file.path) ?? undefined} title={title} className="my-3 w-full" />;
   }
 
   return (
     <p className="my-3">
-      <a href={fileUrl(item.file.path) ?? undefined}>файл</a>
+      <a href={fileUrl(item.file.path) ?? undefined} download>
+        {title || 'файл'}
+      </a>
     </p>
   );
 }
@@ -54,28 +57,18 @@ export function MarkdownView({ source, media = [] }: MarkdownViewProps) {
   const text = source.trim();
 
   if (text.length === 0) {
-    return <p>текста нет</p>;
+    return <p>Текста нет.</p>;
   }
-
-  const pieces: { text: string; slot: number | null }[] = [];
-  let cursor = 0;
-
-  for (const match of text.matchAll(MEDIA_TOKEN)) {
-    pieces.push({ text: text.slice(cursor, match.index), slot: Number(match[1]) - 1 });
-    cursor = match.index + match[0].length;
-  }
-
-  pieces.push({ text: text.slice(cursor), slot: null });
 
   return (
     <div className="md">
-      {pieces.map((piece, index) => (
+      {splitMediaTokens(text).map((piece, index) => (
         <div key={index}>
           {piece.text.trim() ? <Markdown remarkPlugins={[remarkGfm]}>{piece.text}</Markdown> : null}
           {piece.slot === null ? null : media[piece.slot] ? (
             <MediaSlot item={media[piece.slot]} />
           ) : (
-            <p>медиа {piece.slot + 1} нет, ссылка в тексте осталась</p>
+            <p className="hint">Медиа {piece.slot + 1} нет, метка в тексте осталась.</p>
           )}
         </div>
       ))}

@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+import { splitMediaTokens } from './media-token';
+
 interface ReadingValue {
   active: number | null;
   point: (slot: number | null) => void;
@@ -32,27 +34,11 @@ export function useReading(): ReadingValue {
   return useContext(ReadingContext);
 }
 
-const MEDIA_TOKEN = /!\[\[(\d+)\]\]/g;
-
-// текст идёт целиком, метка ![[N]] только помечает место: картинка показывается справа
+// текст идёт целиком, метка ![[N]] только помечает место: медиа показывается справа
 export function ReadingText({ source }: { source: string }) {
   const box = useRef<HTMLDivElement>(null);
   const { point } = useReading();
-
-  const blocks = useMemo(() => {
-    const text = source.trim();
-    const parts: { text: string; slot: number | null }[] = [];
-    let cursor = 0;
-
-    for (const match of text.matchAll(MEDIA_TOKEN)) {
-      parts.push({ text: text.slice(cursor, match.index), slot: Number(match[1]) - 1 });
-      cursor = match.index + match[0].length;
-    }
-
-    parts.push({ text: text.slice(cursor), slot: null });
-
-    return parts;
-  }, [source]);
+  const blocks = useMemo(() => splitMediaTokens(source), [source]);
 
   useEffect(() => {
     const node = box.current;

@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
-/* файлы кладутся в public/fonts, пока их нет работает запасной моноширинный */
+/* файлы кладутся в public/fonts: woff2 основной, ttf запасной для старых браузеров */
 @font-face {
   font-family: 'BD Terminal';
-  src: url('/fonts/bd-terminal.ttf') format('truetype');
+  src: url('/fonts/bd-terminal.woff2') format('woff2'), url('/fonts/bd-terminal.ttf') format('truetype');
   font-weight: 100 900;
   font-display: swap;
 }
 
 @font-face {
   font-family: 'OCR OneC';
-  src: url('/fonts/ocr-onec.ttf') format('truetype');
+  src: url('/fonts/ocr-onec.woff2') format('woff2'), url('/fonts/ocr-onec.ttf') format('truetype');
   font-weight: 400;
   font-display: swap;
 }
@@ -23,22 +23,36 @@
   --face: #d8d8d8;
   --ink: #1b1b1b;
   --accent: #b8002a;
-  --etch: #6d7758;
+  --etch: #5f6a4b;
   --key: #dfdfd8;
   --key-edge: #9a9a92;
   --slot-face: #eef0e8;
   --on: #c9dda2;
+  --rule: rgba(109, 119, 88, 0.45);
 
   --font-display: 'BD Terminal', 'Courier New', ui-monospace, monospace;
   --font-read: 'OCR OneC', 'BD Terminal', 'Courier New', ui-monospace, monospace;
+
+  /* модуль растёт с окном, текст растёт вслед, но медленнее: 12px на ноутбуке, 17px на 4k */
+  --text: clamp(12px, 0.62vw + 3px, 17px);
 }
 
 body {
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: var(--text);
   line-height: 1.45;
   color: var(--ink);
   letter-spacing: 0.01em;
+}
+
+/* всё нажимаемое отзывается, неактивное просто молчит. стоит первым, чтобы фильтры компонентов брали верх */
+:where(a, button:not(:disabled)):hover {
+  filter: brightness(1.08);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* рамка как в интерфейсах нулевых: светлая сверху слева, тёмная снизу справа */
@@ -49,17 +63,6 @@ body {
   border-bottom-color: var(--frame-dark);
   border-right-color: var(--frame-dark);
   background-clip: padding-box;
-}
-
-/* вьюпорт-экран: белая утопленная панель, весь контент строго внутри неё */
-.screen {
-  border: var(--bezel, 10px) solid transparent;
-  border-image: url('/decor/screen.webp') 96 fill stretch;
-  min-height: 0;
-}
-
-.screen-small {
-  --bezel: 7px;
 }
 
 /* клавиша выпуклая, поле утопленное, третьего в приборе нет */
@@ -86,7 +89,7 @@ label.frame:hover {
 button.frame:active,
 a.frame:active,
 button.frame[aria-pressed='true'],
-a.frame[aria-pressed='true'] {
+a.frame[aria-current] {
   background: var(--on);
   border-top-color: var(--frame-dark);
   border-left-color: var(--frame-dark);
@@ -125,20 +128,15 @@ textarea.frame:focus {
   background: #ffffff;
 }
 
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
 .placeholder {
   background: var(--muted);
 }
 
 /* тихая подсказка: видно, но не лезет в глаза */
 .hint {
-  font-size: 11px;
+  font-size: 0.92em;
   line-height: 1.3;
-  color: #6f6f6f;
+  color: #616161;
 }
 
 .hint::before {
@@ -151,7 +149,6 @@ textarea.frame:focus {
   line-height: 1.6;
 }
 
-/* типографика markdown: только ритм и отступы */
 .md > div > :first-child {
   margin-top: 0;
 }
@@ -167,7 +164,7 @@ textarea.frame:focus {
 }
 
 .md h1 { font-size: 1.6em; }
-.md h2 { font-size: 1.35em; }
+.md h2 { font-size: 1.3em; }
 .md h3 { font-size: 1.15em; }
 .md h4 { font-size: 1em; }
 
@@ -229,152 +226,32 @@ textarea.frame:focus {
 
 .md input[type='checkbox'] { margin-right: 0.4em; }
 
-/* оболочка: рамка приезжает, потом проявляется содержимое */
-.sprite {
-  image-rendering: auto;
-}
-
-@keyframes module-in {
-  from {
-    transform: translate(var(--from, 0, 0));
-    opacity: 0;
-  }
-  to {
-    transform: none;
-    opacity: 1;
-  }
-}
-
-@keyframes text-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.world-module {
-  animation: module-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  touch-action: none;
-}
-
-.world-panel {
-  animation: module-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  --from: 0, 60px;
-}
-
-.world-text {
-  animation: text-in 0.45s ease-out 0.55s both;
-  overflow: auto;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .world-module,
-  .world-panel,
-  .world-text {
-    animation: none;
-  }
-}
-
-/* на широком поле правка и предпросмотр стоят рядом, на узком переключаются */
-.editor {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.5rem;
-  min-height: 0;
-}
-
-.editor[data-preview='off'] > .editor-preview {
-  display: none;
-}
-
-.editor[data-preview='on'] > .editor-input {
-  display: none;
-}
-
-@container (min-width: 900px) {
-  .editor {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .editor[data-preview] > .editor-preview,
-  .editor[data-preview] > .editor-input {
-    display: block;
-  }
-
-  .editor-toggle {
-    display: none;
-  }
-}
-
-@keyframes disc-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.edge-rail {
-  position: absolute;
-  z-index: 3;
-  width: 2.4%;
+/* мир: холст с модулем посередине, на низком окне модуль стоит вертикально и страница прокручивается */
+.world {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
   display: flex;
-  flex-direction: column;
-  border: 1px solid #55603f;
-  background: rgba(12, 20, 6, 0.9);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 6px rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-.edge-step {
-  flex: 0 0 auto;
-  height: 14px;
-  padding: 0;
-  border: 1px solid var(--key-edge);
-  border-top-color: #fff;
-  border-left-color: #fff;
-  background: linear-gradient(180deg, #f2f2ee, var(--key));
-  color: var(--ink);
-  font-size: 8px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.edge-step:active {
-  background: var(--on);
-  border-top-color: var(--frame-dark);
-  border-left-color: var(--frame-dark);
-}
-
-.edge-track {
+.world-scroll {
   position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  cursor: pointer;
+  inset: auto;
+  min-height: 100vh;
+  align-items: flex-start;
+  overflow: visible;
+  padding-block: 24px;
 }
 
-.scroll-feed {
-  left: 3.4%;
-  top: 15.4%;
-  height: 71%;
+.plane {
+  position: relative;
+  pointer-events: auto;
+  will-change: transform;
 }
-
-.scroll-text {
-  right: 3.4%;
-  top: 52.6%;
-  height: 33.8%;
-}
-
-.edge-handle {
-  position: absolute;
-  left: 1px;
-  right: 1px;
-  display: block;
-  border: 1px solid var(--key-edge);
-  border-top-color: #fff;
-  border-left-color: #fff;
-  background: linear-gradient(180deg, #f2f2ee, var(--key));
-}
-
 
 /* модуль: рамка спрайтом, вьюпорты разложены по макету в процентах от рамки */
 .module {
@@ -391,76 +268,339 @@ textarea.frame:focus {
   pointer-events: none;
 }
 
+/* провод тянется за модулем слабее самого модуля */
+.cable {
+  position: absolute;
+  left: -13%;
+  top: 52%;
+  width: 30%;
+  pointer-events: none;
+}
+
+/* вьюпорт-экран: спрайт целиком, пропорция залочена по исходнику, содержимое до края светлого поля спрайта
+   (фаска считается экраном, тень нет): --m-t и --m-b в долях высоты, --m-l и --m-r в долях ширины */
+.screen {
+  position: relative;
+  flex: 0 0 auto;
+  width: min(100%, calc(100cqh * var(--ratio)));
+  aspect-ratio: var(--ratio);
+  box-sizing: border-box;
+  padding: calc(var(--m-t) / var(--ratio)) var(--m-r) calc(var(--m-b) / var(--ratio)) var(--m-l);
+  background: var(--sprite) center / 100% 100% no-repeat;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.screen-feed {
+  --sprite: url('/decor/screen-feed.webp');
+  --ratio: 1;
+  --corner: 1.4;
+  --m-t: 6.3%;
+  --m-r: 6.3%;
+  --m-b: 7.2%;
+  --m-l: 6.3%;
+}
+
+.screen-media {
+  --sprite: url('/decor/screen-media.webp');
+  --ratio: 1;
+  --corner: 2;
+  --m-t: 9.8%;
+  --m-r: 9.9%;
+  --m-b: 11.2%;
+  --m-l: 9.9%;
+}
+
+.screen-head {
+  --sprite: url('/decor/screen-head.webp');
+  --ratio: calc(2428 / 1954);
+  --corner: 3.5;
+  --m-t: 24.35%;
+  --m-r: 19.7%;
+  --m-b: 27.95%;
+  --m-l: 19.7%;
+}
+
+.screen-meta {
+  --sprite: url('/decor/screen-meta.webp');
+  --ratio: calc(2428 / 2394);
+  --corner: 3.5;
+  --m-t: 19.88%;
+  --m-r: 19.7%;
+  --m-b: 22.72%;
+  --m-l: 19.7%;
+}
+
+.screen-text {
+  --sprite: url('/decor/screen-text.webp');
+  --ratio: calc(2930 / 3198);
+  --corner: 2.6;
+  --m-t: 9.99%;
+  --m-r: 11%;
+  --m-b: 12.19%;
+  --m-l: 11%;
+}
+
+/* строки развёртки поверх белого поля, как на старом мониторе */
+.screen::after {
+  content: '';
+  position: absolute;
+  top: var(--m-t);
+  right: var(--m-r);
+  bottom: var(--m-b);
+  left: var(--m-l);
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.05) 0,
+    rgba(0, 0, 0, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation: scan 2.4s linear infinite;
+}
+
+@keyframes scan {
+  from { background-position: 0 0; }
+  to { background-position: 0 6px; }
+}
+
+/* коробки экранов сняты с финального макета вместе с тенью спрайта, поэтому заходят на плату.
+   на вертикальном модуле спрайт вписывается в коробку с той же пропорцией и стоит по центру */
 .slot {
   position: absolute;
   z-index: 3;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
+  container-type: size;
 }
 
 .slot-feed {
-  left: 10.6%;
-  right: 41.6%;
-  top: 15.4%;
-  bottom: 13.6%;
+  left: 6.54%;
+  right: 38.76%;
+  top: 10.32%;
+  bottom: 8.83%;
 }
 
 .slot-media {
-  left: 59.2%;
-  right: 10.6%;
-  top: 15.4%;
-  bottom: 48.4%;
+  left: 58.07%;
+  right: 7.11%;
+  top: 10.47%;
+  bottom: 38.06%;
 }
 
 .slot-head {
-  left: 59.2%;
-  right: 29.6%;
-  top: 52.6%;
-  bottom: 32.9%;
+  left: 58.56%;
+  right: 25.97%;
+  top: 55.9%;
+  bottom: 25.69%;
 }
 
 .slot-meta {
-  left: 59.2%;
-  right: 29.6%;
-  top: 68%;
-  bottom: 13.6%;
+  left: 58.56%;
+  right: 25.97%;
+  top: 67.93%;
+  bottom: 9.52%;
 }
 
 .slot-text {
-  left: 70.9%;
-  right: 10.6%;
-  top: 52.6%;
-  bottom: 13.6%;
+  left: 70.77%;
+  right: 8.19%;
+  top: 55.71%;
+  bottom: 10.34%;
 }
 
-/* содержимое экрана прокручивается внутри, наружу ничего не вылезает */
-.slot > .screen {
+/* содержимое экрана живёт внутри белого поля, наружу ничего не вылезает.
+   углы поля у спрайта скруглены, содержимое режется по тому же радиусу, --corner в долях ширины экрана */
+.slot-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.slot-body {
-  flex: 1;
-  min-height: 0;
   overflow: hidden;
   padding: 0;
+  color: var(--ink);
+  line-height: 1.35;
   scrollbar-width: none;
+  border-radius: calc(var(--corner, 1.5) * 1cqw);
 }
 
 .slot-body::-webkit-scrollbar {
   display: none;
 }
 
+/* новая страница проявляется внутри экранов вспышкой, спрайт при этом не мигает */
+.slot-body > * {
+  animation: screen-in 0.16s ease-out both;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    filter: brightness(2.4) contrast(0.6);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+.module[data-fresh] .slot-body {
+  animation: screen-fade 0.18s ease-out;
+}
+
+@keyframes screen-fade {
+  from { opacity: 0.2; }
+  to { opacity: 1; }
+}
+
 /* левый экран читают, он один прокручивается, и то внешней полосой */
 .slot-feed .slot-body {
   overflow: auto;
   overscroll-behavior: contain;
+  padding: 4px;
 }
 
-/* каждый экран подписан травлёной строкой: сразу видно, что это за прибор */
+.slot-media .slot-body {
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-media .slot-body img,
+.slot-media .slot-body video,
+.slot-media .slot-body iframe {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* в правых экранах ничего не вылезает за кромку */
+.slot-head .pad,
+.slot-meta .pad,
+.slot-text .pad {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.slot-head p,
+.slot-meta p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* поля появляются только там, где лежит текст */
+.slot-body > .pad {
+  padding: 3px 5px;
+}
+
+/* заголовки внутри экранов крупнее, иначе не читаются на мелком кегле */
+.slot-body strong {
+  font-size: 1.15em;
+  letter-spacing: 0.01em;
+}
+
+.slot-head strong {
+  display: block;
+  font-size: 1.35em;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slot-body h2,
+.slot-text h2 {
+  margin: 7px 0 3px;
+  font-size: 0.84em;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  color: var(--etch);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* поле подписано травлёным, значение остаётся тёмным */
+.slot-body label {
+  display: block;
+  font-size: 0.84em;
+  letter-spacing: 0.1em;
+  color: var(--etch);
+}
+
+.slot-body label input,
+.slot-body label select,
+.slot-body label textarea {
+  font-size: 1.19em;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+/* группы отделяются волосяной линией, а не рамкой внутри рамки */
+.slot-body fieldset.frame {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  padding: 3px 0 0;
+  margin-top: 9px;
+  box-shadow: none;
+  background: none;
+}
+
+.slot-body legend {
+  padding: 0 5px 0 0;
+  font-size: 0.84em;
+  letter-spacing: 0.14em;
+  color: var(--etch);
+}
+
+/* каждый экран подписан травлёной биркой: плашка только под текстом, к углам и свечению она не прижимается */
+.screen-cap {
+  position: sticky;
+  top: 2px;
+  z-index: 2;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  display: inline-block;
+  margin: 2px 0 2px 6px;
+  padding: 1px 6px;
+  font-size: 0.84em;
+  letter-spacing: 0.14em;
+  color: var(--etch);
+  background: var(--muted);
+  border: 1px solid var(--rule);
+}
+
+/* шильдик прибора: подпись слева, значение справа, между ними пунктир */
+.plate-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.plate-row > .plate-name {
+  font-size: 0.84em;
+  letter-spacing: 0.1em;
+  color: var(--etch);
+  white-space: nowrap;
+}
+
+.plate-row > .plate-lead {
+  flex: 1 1 auto;
+  border-bottom: 1px dotted rgba(109, 119, 88, 0.6);
+  transform: translateY(-2px);
+}
+
+.plate-row > .plate-value {
+  white-space: nowrap;
+}
+
+/* правые экраны не прокручиваются: содержимое разливается по колонкам шириной в экран и листается по кругу.
+   неразрывными оставлены только мелкие вещи: длинный неразрывный блок выше страницы целиком уходит на следующую
+   и оставляет первую пустой */
 .pager {
   position: relative;
   flex: 1 1 auto;
@@ -477,9 +617,7 @@ textarea.frame:focus {
   transition: transform 0.14s steps(3, end);
 }
 
-.pager-flow li,
 .pager-flow label,
-.pager-flow fieldset,
 .pager-flow img,
 .pager-flow button {
   break-inside: avoid;
@@ -490,158 +628,123 @@ textarea.frame:focus {
   right: 1px;
   bottom: 1px;
   z-index: 3;
-  width: 17px;
-  height: 24px;
+  width: 20px;
+  height: 26px;
   border: 1px solid var(--key-edge);
   border-top-color: #fff;
   border-left-color: #fff;
   background: linear-gradient(180deg, #f2f2ee, var(--key));
   cursor: pointer;
-  font-size: 13px;
+  font-size: 1.1em;
   line-height: 1;
+  transition: width 0.12s ease-out, opacity 0.12s ease-out;
 }
 
-.screen-cap {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  flex: 0 0 auto;
-  display: block;
-  padding: 2px 5px 1px;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--etch);
-  background: var(--muted);
-  border-bottom: 1px solid rgba(109, 119, 88, 0.45);
+/* маленькие экраны: белое поле узкое, поэтому кегль чуть меньше, а стрелка листания
+   ужата до уголка в правом нижнем углу и вырастает в кнопку под курсором или фокусом */
+.slot-head .slot-body,
+.slot-meta .slot-body {
+  font-size: 0.9em;
 }
 
-.slot-body {
+.slot-head .pager-next,
+.slot-meta .pager-next {
+  width: 12px;
+  height: 14px;
+  font-size: 0.85em;
+}
+
+.slot-head:hover .pager-next,
+.slot-meta:hover .pager-next,
+.slot-head:focus-within .pager-next,
+.slot-meta:focus-within .pager-next {
+  width: 20px;
+  height: 26px;
+  font-size: 1.1em;
+}
+
+/* полоса прокрутки: столбик светодиодов в духе скинов winamp. пролистанное горит, остальное тлеет.
+   всё резкое, без скруглений и сглаживания, чтобы сидеть на плате как деталь */
+.edge-rail {
+  position: absolute;
+  z-index: 3;
+  width: 2.2%;
   display: flex;
   flex-direction: column;
-  color: var(--ink);
-  font-size: 12px;
-  line-height: 1.35;
+  gap: 1px;
+  padding: 1px;
+  border: 1px solid #1b2408;
+  background: #3a4a17;
+  box-shadow: inset 1px 1px 0 #6b7e2a, inset -1px -1px 0 #1b2408, 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
-.slot-body strong {
-  font-size: 1.15em;
-  letter-spacing: 0.01em;
-}
-
-.slot-head .slot-body strong {
-  display: block;
-  font-size: clamp(13px, 1.35vw, 19px);
-  line-height: 1.1;
-}
-
-.slot-body h2 {
-  margin: 7px 0 3px;
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.14em;
-  color: var(--etch);
-  border-bottom: 1px solid rgba(109, 119, 88, 0.45);
-}
-
-/* поле подписано травлёным, значение остаётся тёмным */
-.slot-body label {
-  display: block;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--etch);
-}
-
-.slot-body label input,
-.slot-body label select,
-.slot-body label textarea {
-  font-size: 12px;
-  letter-spacing: 0;
-  color: var(--ink);
-}
-
-/* группы отделяются волосяной линией, а не рамкой внутри рамки */
-.slot-body fieldset.frame {
-  border: 0;
-  border-top: 1px solid rgba(109, 119, 88, 0.45);
-  padding: 3px 0 0;
-  margin-top: 9px;
-  box-shadow: none;
-  background: none;
-}
-
-.slot-body legend {
-  padding: 0 5px 0 0;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--etch);
-}
-
-/* шильдик прибора: подпись слева, значение справа, между ними пунктир */
-.plate-row {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-
-.plate-row > .plate-name {
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--etch);
-  white-space: nowrap;
-}
-
-.plate-row > .plate-lead {
-  flex: 1 1 auto;
-  border-bottom: 1px dotted rgba(109, 119, 88, 0.6);
-  transform: translateY(-2px);
-}
-
-.plate-row > .plate-value {
-  white-space: nowrap;
-}
-
-
-
-
-
-
-
-
-
-/* поля появляются только там, где лежит текст */
-.slot-body > .pad {
-  padding: 3px 5px;
-}
-
-.slot-media .slot-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.edge-step {
+  flex: 0 0 auto;
+  height: 14px;
   padding: 0;
-  overflow: hidden;
-  background: #d9d9d9;
+  border: 1px solid #1b2408;
+  background: #4a5c1c;
+  color: #c0e000;
+  font-size: 0.6em;
+  line-height: 1;
+  cursor: pointer;
+  text-shadow: 0 0 3px rgba(192, 224, 0, 0.8);
 }
 
-.slot-media .slot-body img,
-.slot-media .slot-body video,
-.slot-media .slot-body iframe {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.edge-step:hover {
+  background: #566a21;
 }
 
-.slot-feed .slot-body {
-  padding: 4px;
+.edge-step:active {
+  background: #2f3d12;
+  color: #f6ff8a;
 }
 
-/* органы управления лежат на рамке, вне экранов */
+.edge-track {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 1px;
+  background: #222d0c;
+  cursor: pointer;
+}
+
+.led {
+  flex: 1 1 0;
+  min-height: 2px;
+  background: #48561a;
+  box-shadow: inset 0 -1px 0 #222d0c;
+}
+
+.led-on {
+  background: #c0e000;
+  box-shadow: 0 0 3px #c0e000, 0 0 6px rgba(192, 224, 0, 0.55);
+}
+
+.led-peak {
+  background: #f6ff8a;
+  box-shadow: 0 0 3px #f6ff8a, 0 0 6px rgba(246, 255, 138, 0.6);
+}
+
+.scroll-feed {
+  left: 4.3%;
+  top: 23%;
+  height: 11%;
+  width: 2.2%;
+}
+
+/* зелёные клавиши лежат слоем над платой и экранами, чуть ниже и левее паза */
 .rail {
   position: absolute;
-  z-index: 1;
+  z-index: 4;
   left: 1.1%;
   top: 34%;
   height: 50%;
   aspect-ratio: 1312 / 4830;
+  transform: translate(-9px, 9px);
   background: url('/decor/rail.webp') center / 100% 100% no-repeat;
 }
 
@@ -662,7 +765,7 @@ textarea.frame:focus {
   inset: 0;
   width: 100%;
   height: 100%;
-  transition: transform 0.08s ease-out, filter 0.12s ease-out;
+  transition: filter 0.12s ease-out;
 }
 
 .rail-slot:hover > img {
@@ -683,6 +786,20 @@ textarea.frame:focus {
   filter: grayscale(0.7) brightness(0.82);
 }
 
+/* подписи на кнопках рамки: без них не понять, что делает спрайт */
+.rail-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  font-size: 0.84em;
+  letter-spacing: 0.06em;
+  color: #14260a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .knob {
   position: absolute;
   z-index: 3;
@@ -690,6 +807,7 @@ textarea.frame:focus {
   background: none;
   padding: 0;
   cursor: pointer;
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.55));
 }
 
 .knob > img {
@@ -715,10 +833,6 @@ textarea.frame:focus {
   filter: brightness(0.75);
 }
 
-.knob {
-  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.55));
-}
-
 .knob-up {
   left: 41.3%;
   width: 12.9%;
@@ -733,28 +847,97 @@ textarea.frame:focus {
   height: 13.4%;
 }
 
-/* плеер стоит слева сверху на рамке, над лентой */
+.knob-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75em;
+  color: #d8d8d8;
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.rail-slot:disabled .rail-label,
+.knob:disabled .knob-label {
+  color: #5c6b4c;
+}
+
+/* плеер разнесён по плате: динамик с диском слева сверху над лентой, слоем выше экранов, диск лежит поверх левого экрана */
 .deck {
   position: absolute;
-  z-index: 3;
+  z-index: 5;
   left: 2.4%;
   top: 1.6%;
-  width: 38%;
   height: 12.6%;
   display: flex;
   align-items: center;
-  gap: 0.8%;
+}
+
+/* динамик с диском поверх: диск чуть заходит на экран, но живёт над ним */
+.deck-drive {
+  position: relative;
+  height: 150%;
+  aspect-ratio: 1;
+  margin-top: 2%;
+  flex-shrink: 0;
 }
 
 .deck-speaker {
-  height: 210%;
-  aspect-ratio: 1;
+  width: 100%;
+  height: 100%;
   border: 0;
   background: none;
   padding: 0;
-  margin-top: 2%;
   cursor: pointer;
-  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.deck-speaker > img,
+.disc-face {
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.disc {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150%;
+  aspect-ratio: 1;
+  margin: -75% 0 0 -75%;
+  z-index: 6;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+}
+
+.disc.held {
+  cursor: grabbing;
+}
+
+.disc-face {
+  width: 100%;
+  height: 100%;
+  display: block;
+  animation: disc-spin 2.4s linear infinite;
+  animation-play-state: paused;
+}
+
+.disc-face.spinning {
+  animation-play-state: running;
+}
+
+@keyframes disc-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .deck-speaker > img {
@@ -770,24 +953,21 @@ textarea.frame:focus {
   filter: grayscale(0.9) brightness(0.85);
 }
 
-@keyframes speaker-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  45% {
-    transform: scale(1.07);
-  }
-}
-
 .deck-speaker.playing > img {
   animation: speaker-pulse 0.62s ease-in-out infinite;
 }
 
+@keyframes speaker-pulse {
+  0%,
+  100% { transform: scale(1); }
+  45% { transform: scale(1.07); }
+}
+
 .deck-timeline {
   position: relative;
-  flex: 1 1 auto;
-  height: 14%;
+  flex: 0 0 60%;
+  min-width: 0;
+  height: 55%;
   background: url('/decor/timeline.webp') center / 100% 100% no-repeat;
   cursor: pointer;
   touch-action: none;
@@ -802,39 +982,94 @@ textarea.frame:focus {
   pointer-events: none;
 }
 
-.deck-plate {
-  flex: 0 0 34%;
-  height: 62%;
+/* табло в одну строку: название и таймкод правее диска, в полосе над лентой. слой выше экрана, иначе его перекрывает край ленты */
+.deck-read {
+  position: absolute;
+  z-index: 4;
+  left: 17.3%;
+  top: 11.2%;
+  width: 25%;
+  height: 2.7%;
   display: flex;
-  align-items: stretch;
-  gap: 2px;
-  padding: 2px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 3px;
   overflow: hidden;
   color: #e9e9e9;
   background: #101010;
   border: 1px solid #000;
   box-shadow: inset 0 0 0 1px #3a3a3a, inset 0 2px 6px rgba(0, 0, 0, 0.9);
-  font-size: 11px;
+  font-size: clamp(10px, 0.95vw, 15px);
 }
 
-/* транспорт стоит столбиком, иначе на табло не остаётся места под название */
-.deck-keys {
+/* нет сигнала на табло: красным, тем же языком что и экраны */
+.deck-read-empty {
+  color: #ff2b45;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.deck-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline dotted rgba(233, 233, 233, 0.5);
+}
+
+/* таймкод справа, как счётчик на деке */
+.deck-time {
+  flex: 0 0 auto;
+  font-size: 0.85em;
+  letter-spacing: 0.08em;
+  color: #a8c77e;
+  white-space: nowrap;
+}
+
+/* таймлайн и транспорт в нижней полосе платы под лентой, до выреза платы справа */
+.deck-transport {
+  position: absolute;
+  z-index: 4;
+  left: 9.2%;
+  top: 88.7%;
+  width: 24%;
+  height: 3.5%;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  align-items: center;
+  gap: 4%;
+  font-size: clamp(10px, 0.95vw, 15px);
+}
+
+.deck-keys {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  display: flex;
   gap: 1px;
-  flex-shrink: 0;
+  padding: 1px;
+  background: #101010;
+  border: 1px solid #000;
+  box-shadow: inset 0 0 0 1px #3a3a3a, inset 0 2px 6px rgba(0, 0, 0, 0.9);
 }
 
 .deck-keys > button {
   flex: 1 1 0;
-  min-width: 18px;
+  min-width: 0;
   padding: 0;
-  font-size: 9px;
   border: 1px solid #3a3a3a;
   background: #1c1c1c;
   color: #e9e9e9;
   font: inherit;
+  font-size: 0.7em;
   line-height: 1;
   cursor: pointer;
 }
@@ -844,54 +1079,436 @@ textarea.frame:focus {
   cursor: default;
 }
 
-.deck-read {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+.deck-volume {
+  accent-color: var(--etch);
 }
 
-/* таймкод стоит отдельной строкой под названием, как счётчик на деке */
-.deck-time {
-  flex: 0 0 auto;
-  padding: 0 2px;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: #a8c77e;
+/* дата и цена в самом маленьком экране: крупная строка туда не влезает */
+.slot-head .headline {
+  font-size: 1em;
+  margin: 0.3em 0;
 }
 
-.deck-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  line-height: 1.15;
-  padding: 0 2px;
-  cursor: pointer;
-  text-align: left;
-  word-break: break-word;
-}
-
-.deck-name::-webkit-scrollbar {
-  display: none;
-}
-
-/* провод тянется за модулем слабее самого модуля */
-.cable {
+/* заголовок наверху модуля: где ты сейчас. слой выше экрана, иначе тень спрайта показа ложится на текст */
+.here {
   position: absolute;
-  left: -13%;
-  top: 52%;
-  width: 30%;
+  z-index: 4;
+  left: 52%;
+  right: 11.5%;
+  top: 11.2%;
+  height: 2.7%;
+  font-size: clamp(11px, 1.15vw, 17px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 8px;
+  color: #dfe8c8;
+  text-shadow: 0 1px 3px #000;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
   pointer-events: none;
 }
 
-/* шум живой: лента из шести кадров прокручивается ступенями */
+.here b {
+  font-weight: 700;
+  color: #fff;
+}
+
+/* пока грузится другая страница, логотип стоит в левом экране и никуда не вылезает */
+.passage {
+  z-index: 4;
+  pointer-events: none;
+}
+
+.passage .slot-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--muted);
+}
+
+/* ascii-заглушка на время загрузки */
+.ascii-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+}
+
+.ascii-wait img {
+  max-width: 70%;
+  max-height: 62%;
+  object-fit: contain;
+  opacity: 0.85;
+  animation: ascii-blink 1.1s steps(2) infinite;
+}
+
+@keyframes ascii-blink {
+  50% { opacity: 0.45; }
+}
+
+.ascii-wait span {
+  letter-spacing: 0.16em;
+  color: #4a4a4a;
+}
+
+/* сообщения лежат на ascii-декоре */
+.ascii-note {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 74px;
+  padding: 10px 14px;
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  text-align: center;
+}
+
+.ascii-note > span {
+  background: rgba(255, 255, 255, 0.86);
+  padding: 2px 8px;
+}
+
+/* нет сигнала: белый шум с красной надписью, тем же языком что и плеер */
+.no-signal {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  overflow: hidden;
+}
+
+.no-signal > canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.no-signal > span {
+  position: relative;
+  color: #e00024;
+  font-weight: 700;
+  font-size: clamp(14px, 1.9vw, 30px);
+  text-align: center;
+  letter-spacing: 0.1em;
+  padding: 2px 10px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.82);
+}
+
+/* сетка контейнера: три колонки на горизонтальном модуле, две на вертикальном. от окна не зависит */
+.entity-grid {
+  columns: 3;
+  column-gap: 0.75rem;
+}
+
+.entity-cell {
+  margin-bottom: 0.75rem;
+  break-inside: avoid;
+}
+
+.tile {
+  position: relative;
+  display: block;
+  border: 1px solid var(--frame);
+  border-top-color: var(--frame-light);
+  border-left-color: var(--frame-light);
+  border-bottom-color: var(--frame-dark);
+  border-right-color: var(--frame-dark);
+  background-clip: padding-box;
+}
+
+.tile[aria-current],
+.tile[aria-pressed='true'] {
+  outline: 2px solid #333;
+}
+
+.tile-gone {
+  opacity: 0.6;
+}
+
+.tile-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 4px;
+  font-size: 0.92em;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* карточка участников: кнопка добавления спрайтом с макета */
+.participants {
+  margin-top: 4px;
+}
+
+.add-person {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.add-person > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* лента главной: один предмет во весь экран */
+.tape {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.tape-shot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.tape-shot img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.tape-name {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  max-width: 78%;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tape-next {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 40px;
+  border: 0;
+  cursor: pointer;
+  background: url('/decor/screen.webp') center / 100% 100% no-repeat;
+  font-size: 1.3em;
+}
+
+/* кнопка «очереди» у управляющего в правом верхнем углу экрана показа, «развернуть» в правом нижнем */
+.queue-tools {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  z-index: 2;
+  font-size: 0.92em;
+}
+
+.queue-expand {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 2;
+  font-size: 0.92em;
+}
+
+/* дни расписания лежат плитками в одну строку, стрелка листания в конце строки */
+.days {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.days-grid {
+  display: flex;
+  gap: 3px;
+}
+
+.day {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.6em;
+  padding: 2px 0;
+  line-height: 1.05;
+  border: 0;
+  cursor: pointer;
+  background: url('/decor/screen.webp') center / 100% 100% no-repeat;
+  font-variant-numeric: tabular-nums;
+}
+
+.day:hover {
+  filter: brightness(0.94);
+}
+
+.day-more {
+  flex: 0 0 1.6em;
+  font-size: 1.2em;
+}
+
+.days-note {
+  font-size: 0.84em;
+  overflow: hidden;
+}
+
+/* начало текста разливается по страницам экрана, целиком открывается модалкой.
+   блок нельзя делать неразрывным (overflow, фиксированная высота): целиком не влезающий в страницу
+   кусок уезжает на следующую, а первая остаётся пустой */
+.clamped h2 {
+  font-size: 1.1em;
+  margin: 0 0 2px;
+}
+
+/* текст предмета читается целиком слева */
+.reading {
+  padding: 4px 8px 12px;
+}
+
+.links-star {
+  display: inline-block;
+}
+
+.links-drop {
+  margin-top: 2px;
+  padding: 2px 4px;
+  background: var(--muted);
+  border: 1px solid var(--frame);
+}
+
+.links-drop li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* экран показа принимает файлы перетаскиванием */
+.drop {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drop[data-over] {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
+
+.drop-add {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  z-index: 2;
+  font-size: 0.92em;
+  background: var(--muted);
+}
+
+.drop-note {
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  z-index: 2;
+  max-width: 96%;
+  padding: 0 4px;
+  font-size: 0.92em;
+  background: var(--muted);
+  border: 1px solid var(--frame);
+}
+
+/* форма в большом левом экране: секции одной колонкой, экран прокручивается */
+.form-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 8px 12px;
+}
+
+.form-section > h2 {
+  margin-top: 0;
+}
+
+.form-section fieldset.frame:first-of-type {
+  margin-top: 0;
+}
+
+/* редактор: на широком экране правка и предпросмотр рядом, на узком переключаются */
+.editor-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  container-type: inline-size;
+}
+
+.editor-input {
+  width: 100%;
+  resize: vertical;
+}
+
+.editor {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  min-height: 0;
+  flex: 1;
+}
+
+.editor[data-preview='off'] > .editor-preview {
+  display: none;
+}
+
+.editor[data-preview='on'] > .editor-input {
+  display: none;
+}
+
+@container (min-width: 900px) {
+  .editor {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .editor[data-preview] > .editor-preview,
+  .editor[data-preview] > .editor-input {
+    display: block;
+  }
+
+  .editor-toggle {
+    display: none;
+  }
+}
+
+.inbox-read {
+  opacity: 0.6;
+}
+
+/* шум живой: холст на весь экран за всем остальным */
 .noise {
   position: fixed;
   inset: 0;
@@ -902,12 +1519,54 @@ textarea.frame:focus {
   image-rendering: pixelated;
 }
 
-/* модалка в рамке-вспышке, содержимое строго в её середине */
+/* логотипы летают на нулевом слое: ниже отрицательного нажатие забирает body, модуль рисуется поверх */
+.logos {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.logo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  pointer-events: auto;
+  will-change: transform;
+  cursor: pointer;
+}
+
+/* модалка в рамке-вспышке, содержимое строго в её середине. на телефоне рамка ужимается */
+.sheet-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
 .sheet {
-  border: 96px solid transparent;
+  position: relative;
+  width: min(760px, 96vw);
+  max-height: 88dvh;
+  border: min(96px, 14vw) solid transparent;
   border-image: url('/decor/modal.webp') 300 340 fill stretch;
   background: none;
   color: #fff;
+}
+
+.sheet-wide {
+  width: min(max(58vw, 420px), 980px, 96vw);
+}
+
+.sheet-body {
+  overflow: auto;
+  max-height: calc(88dvh - 2 * min(96px, 14vw) - 8px);
 }
 
 .sheet-close {
@@ -955,181 +1614,7 @@ textarea.frame:focus {
   color: #ffc9c9;
 }
 
-.slot {
-  --rail-room: 0;
-}
-
-.slot-body {
-  position: relative;
-}
-
-/* подписи на кнопках рамки: без них не понять, что делает спрайт */
-.rail-label {
-  position: absolute;
-  left: 34%;
-  top: 50%;
-  transform: translate(-50%, -50%) rotate(-90deg);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: #14260a;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-.knob-label {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 9px;
-  color: #d8d8d8;
-  text-shadow: 0 1px 2px #000;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-.rail-slot:disabled .rail-label,
-.knob:disabled .knob-label {
-  color: #5c6b4c;
-}
-
-/* табло плеера не должно вылезать за рамку */
-.deck-plate {
-  min-width: 0;
-}
-
-.deck-timeline {
-  flex: 1 1 30%;
-  min-width: 0;
-}
-
-.deck-plate-empty {
-  color: var(--accent);
-}
-
-/* нет сигнала: белый шум с красной надписью, тем же языком что и плеер */
-.no-signal {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  min-height: 120px;
-  overflow: hidden;
-}
-
-.no-signal > canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  image-rendering: pixelated;
-}
-
-.no-signal > span {
-  position: relative;
-  color: #e00024;
-  font-weight: 700;
-  font-size: clamp(14px, 1.9vw, 30px);
-  text-align: center;
-  letter-spacing: 0.1em;
-  padding: 2px 10px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.82);
-}
-
-/* дни расписания лежат плитками и не прокручиваются */
-.days {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  height: 100%;
-}
-
-.days-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(34px, 1fr));
-  align-content: stretch;
-  gap: 3px;
-  flex: 1;
-  min-height: 0;
-}
-
-.day-more {
-  flex: 0 0 auto;
-  font-size: 14px;
-}
-
-.day {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 0;
-  line-height: 1.05;
-  border: 0;
-  cursor: pointer;
-  background: url('/decor/screen.webp') center / 100% 100% no-repeat;
-  font-variant-numeric: tabular-nums;
-}
-
-.day:hover {
-  filter: brightness(0.94);
-}
-
-.days-note {
-  font-size: 10px;
-  overflow: hidden;
-}
-
-/* текст обрезается по месту, целиком открывается модалкой */
-.clamped {
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.clamped > .md {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.clamped h2 {
-  font-size: 1.1em;
-  margin: 0 0 2px;
-}
-
-/* заголовок наверху модуля: где ты сейчас */
-.here {
-  position: absolute;
-  z-index: 3;
-  left: 52%;
-  right: 11.5%;
-  top: 8.2%;
-  height: 5.6%;
-  font-size: clamp(11px, 1.15vw, 17px);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: 0 8px;
-  color: #dfe8c8;
-  text-shadow: 0 1px 3px #000;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.here b {
-  font-weight: 700;
-  color: #fff;
-}
-
+/* полоса служебных адресов: по умолчанию свёрнута до кнопки, чтобы не закрывать деку */
 .nav {
   position: fixed;
   left: 0;
@@ -1141,7 +1626,7 @@ textarea.frame:focus {
   gap: 4px;
   max-width: 100%;
   padding: 3px 5px;
-  font-size: 11px;
+  font-size: 0.92em;
   background: var(--face);
   border-bottom: 1px solid var(--frame-dark);
   border-right: 1px solid var(--frame-dark);
@@ -1182,259 +1667,11 @@ textarea.frame:focus {
   border-right-color: var(--frame-light);
 }
 
-/* всё нажимаемое отзывается, неактивное просто молчит */
-a:hover,
-button:not(:disabled):hover {
-  filter: brightness(1.08);
-}
-
-.day {
-  min-height: 26px;
-}
-
-.days-grid {
-  grid-auto-rows: 1fr;
-  height: 100%;
-}
-
-/* в правых экранах ничего не вылезает за кромку */
-.slot-head .slot-body,
-.slot-meta .slot-body,
-.slot-text .slot-body {
-  display: flex;
-  flex-direction: column;
-}
-
-.slot-head .pad,
-.slot-meta .pad,
-.slot-text .pad {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.slot-head p,
-.slot-meta p {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.slot-head strong {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* лента главной: один объект во весь экран */
-.tape {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-.tape-shot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-
-.tape-shot img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-}
-
-.tape-name {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  max-width: 78%;
-  padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.85);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.links-star {
-  display: inline-block;
-}
-
-.links-drop {
-  margin-top: 2px;
-  padding: 2px 4px;
-  background: var(--muted);
-  border: 1px solid var(--frame);
-}
-
-.links-drop li {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.drop {
-  position: relative;
-  height: 100%;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.drop[data-over] {
-  outline: 2px dashed var(--accent);
-  outline-offset: -4px;
-}
-
-.drop-add {
-  position: absolute;
-  right: 2px;
-  top: 2px;
-  z-index: 2;
-  font-size: 11px;
-  background: var(--muted);
-}
-
-.drop-note {
-  position: absolute;
-  left: 2px;
-  bottom: 2px;
-  z-index: 2;
-  max-width: 96%;
-  padding: 0 4px;
-  font-size: 11px;
-  background: var(--muted);
-  border: 1px solid var(--frame);
-}
-
-.queue-tools {
-  position: absolute;
-  left: 2px;
-  bottom: 2px;
-  z-index: 2;
-  font-size: 11px;
-}
-
-.tape-next {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 26px;
-  height: 40px;
-  border: 0;
-  cursor: pointer;
-  background: url('/decor/screen.webp') center / 100% 100% no-repeat;
-  font-size: 16px;
-}
-
-/* текст объекта читается целиком слева */
-.reading {
-  padding: 4px 8px 12px;
-}
-
-/* вертикаль: рамка повёрнута на бок, экраны переразмечены под столбик */
-.module.tall .module-frame {
-  transform: rotate(90deg);
-  transform-origin: center;
-  width: 148%;
-  height: 67.6%;
-  left: -24%;
-  top: 16.2%;
-}
-
-.module.tall .slot-feed {
-  left: 15.4%;
-  right: 15.4%;
-  top: 10.6%;
-  bottom: 48%;
-}
-
-.module.tall .slot-media {
-  left: 15.4%;
-  right: 15.4%;
-  top: 53.4%;
-  bottom: 27.4%;
-}
-
-.module.tall .slot-head {
-  left: 15.4%;
-  right: 52%;
-  top: 73.6%;
-  bottom: 16.4%;
-}
-
-.module.tall .slot-meta {
-  left: 15.4%;
-  right: 52%;
-  top: 84.4%;
-  bottom: 6%;
-}
-
-.module.tall .slot-text {
-  left: 49.4%;
-  right: 15.4%;
-  top: 73.6%;
-  bottom: 6%;
-}
-
-.module.tall .rail {
-  left: 2%;
-  top: 30%;
-  height: 34%;
-}
-
-.module.tall .deck {
-  left: 14%;
-  top: 4.4%;
-  width: 72%;
-  height: 5%;
-}
-
-.module.tall .here {
-  left: 14%;
-  right: 14%;
-  top: 92.5%;
-  height: 4%;
-  justify-content: center;
-}
-
-.module.tall .knob-up {
-  left: 4%;
-  top: 10%;
-  width: 9%;
-  height: 7%;
-}
-
-.module.tall .knob-down {
-  left: 87%;
-  top: 10%;
-  width: 9%;
-  height: 7%;
-}
-
-.module.tall .scroll-feed {
-  left: 12.2%;
-  top: 10.6%;
-  height: 41.4%;
-  width: 2.4%;
-}
-
-.module.tall .scroll-text {
-  right: 12.2%;
-  top: 73.6%;
-  height: 20.4%;
-  width: 2.4%;
-}
-
 /* включение экранов при заходе на сайт */
+.boot .module {
+  animation: power-on 0.42s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
 @keyframes power-on {
   0% {
     opacity: 0;
@@ -1460,19 +1697,6 @@ button:not(:disabled):hover {
   }
 }
 
-@keyframes flash-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-.boot .module {
-  animation: power-on 0.42s cubic-bezier(0.2, 0.9, 0.2, 1) both;
-}
-
 .boot-flash {
   position: fixed;
   inset: 0;
@@ -1482,145 +1706,235 @@ button:not(:disabled):hover {
   animation: flash-out 0.35s ease-out forwards;
 }
 
-/* переход между страницами: содержимое экранов проявляется вспышкой */
-@keyframes screen-in {
-  from {
-    opacity: 0;
-    filter: brightness(2.4) contrast(0.6);
-  }
-  to {
-    opacity: 1;
-    filter: none;
-  }
+@keyframes flash-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
-.slot-body > * {
-  animation: screen-in 0.16s ease-out both;
+/* вертикаль: рамка повёрнута на бок, экраны переразмечены под столбик */
+.module.tall .module-frame {
+  transform: rotate(90deg);
+  transform-origin: center;
+  width: 148%;
+  height: 67.6%;
+  left: -24%;
+  top: 16.2%;
 }
 
-@keyframes screen-fade {
-  from {
-    opacity: 0.2;
-  }
-  to {
-    opacity: 1;
-  }
+/* вертикаль без макета: три ряда по центру платы, все пять спрайтов в родных пропорциях.
+   сетка сверху, под ней показ и текст, ниже паспорт и участники. высота ряда считается из ширины и пропорции спрайта */
+.module.tall .slot-feed {
+  left: 21.75%;
+  right: 21.75%;
+  top: 10.6%;
+  bottom: 51.22%;
 }
 
-/* пока грузится другая страница, логотип стоит в левом экране и никуда не вылезает */
-.passage {
-  z-index: 4;
-  pointer-events: none;
+.module.tall .slot-media {
+  left: 18.05%;
+  right: 49.25%;
+  top: 49.6%;
+  bottom: 28.3%;
 }
 
-.passage .slot-body {
-  display: flex;
-  align-items: center;
+.module.tall .slot-text {
+  left: 51.95%;
+  right: 18.05%;
+  top: 49.6%;
+  bottom: 28.3%;
+}
+
+.module.tall .slot-head {
+  left: 20.05%;
+  right: 47.65%;
+  top: 72.5%;
+  bottom: 9.93%;
+}
+
+.module.tall .slot-meta {
+  left: 53.55%;
+  right: 20.05%;
+  top: 72.5%;
+  bottom: 9.93%;
+}
+
+.module.tall .rail {
+  left: 2%;
+  top: 30%;
+  height: 34%;
+}
+
+.module.tall .deck {
+  left: 14%;
+  top: 4.4%;
+  height: 5%;
+}
+
+.module.tall .deck-read {
+  left: 26%;
+  top: 4%;
+  width: 48%;
+  height: 2.4%;
+}
+
+.module.tall .deck-transport {
+  left: 26%;
+  top: 7%;
+  width: 48%;
+  height: 2.8%;
+}
+
+.module.tall .here {
+  left: 14%;
+  right: 14%;
+  top: 92.5%;
+  height: 4%;
   justify-content: center;
-  background: var(--muted);
 }
 
-/* новая страница проявляется внутри экранов, рамка при этом не мигает */
-.module[data-fresh] .slot > .screen {
-  animation: screen-fade 0.18s ease-out;
+.module.tall .knob-up {
+  left: 4%;
+  top: 10%;
+  width: 9%;
+  height: 7%;
 }
 
-@keyframes scan {
-  from {
-    background-position: 0 0;
+.module.tall .knob-down {
+  left: 87%;
+  top: 10%;
+  width: 9%;
+  height: 7%;
+}
+
+.module.tall .scroll-feed {
+  left: 4.5%;
+  top: 19%;
+  height: 8%;
+  width: 4%;
+}
+
+.module.tall .entity-grid {
+  columns: 2;
+}
+
+/* телефон стоймя: рамки нет, пять экранов стоят столбиком во всю ширину в родных пропорциях,
+   страница прокручивается пальцем. сверху полоса платы: дека, табло, «вы здесь», клавиши */
+@media (max-width: 559px) and (orientation: portrait) {
+  :root {
+    --text: 14px;
   }
-  to {
-    background-position: 0 6px;
-  }
 }
 
-/* строки развёртки поверх экранов, как на старом мониторе */
-.slot > .screen {
+.world-phone {
   position: relative;
+  inset: auto;
+  min-height: 100vh;
+  align-items: flex-start;
+  overflow: visible;
+  padding-block: 0 24px;
 }
 
-.slot > .screen::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.05) 0,
-    rgba(0, 0, 0, 0.05) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  animation: scan 2.4s linear infinite;
+.world-phone .cable {
+  display: none;
 }
 
-/* ascii-заглушка на время загрузки */
-.ascii-wait {
+.module.phone {
+  height: auto;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  flex-wrap: wrap;
+  align-content: flex-start;
   gap: 6px;
-  width: 100%;
-  height: 100%;
-  padding: 8px;
+  padding: 232px 8px 0;
+  box-sizing: border-box;
 }
 
-.ascii-wait img {
-  max-width: 70%;
-  max-height: 62%;
-  object-fit: contain;
-  opacity: 0.85;
-  animation: ascii-blink 1.1s steps(2) infinite;
+/* полоса платы под декой: кусок спрайта модуля без его чёрных полей */
+.module.phone .module-frame {
+  inset: 0 0 auto;
+  height: 226px;
+  background: url('/decor/module.webp') center / 118% auto no-repeat;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55);
 }
 
-@keyframes ascii-blink {
-  50% {
-    opacity: 0.45;
-  }
-}
-
-.ascii-wait span {
-  letter-spacing: 0.16em;
-  color: #4a4a4a;
-}
-
-/* сообщения лежат на ascii-декоре */
-.ascii-note {
+.module.phone .slot {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 74px;
-  padding: 10px 14px;
-  background-position: center;
-  background-size: contain;
-  background-repeat: no-repeat;
-  text-align: center;
+  inset: auto;
+  flex: 1 1 100%;
+  min-width: 0;
+  container-type: inline-size;
 }
 
-.ascii-note > span {
-  background: rgba(255, 255, 255, 0.86);
-  padding: 2px 8px;
+.module.phone .screen {
+  width: 100%;
 }
 
-/* заголовки внутри экранов крупнее, иначе не читаются на мелком кегле */
-.slot-head strong {
-  font-size: 1.35em;
-  line-height: 1.15;
+/* лента крутится пальцем, и дальше неё прокрутка уходит странице */
+.module.phone .slot-feed .slot-body {
+  overscroll-behavior: auto;
 }
 
-.slot-text h2,
-.md h2 {
-  font-size: 1.3em;
+.module.phone .scroll-feed {
+  display: none;
 }
 
-.deck-plate {
-  font-size: clamp(10px, 0.95vw, 15px);
+.module.phone .entity-grid {
+  columns: 2;
 }
 
-.deck-plate-empty {
-  color: #ff2b45;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+.module.phone .deck {
+  left: 14px;
+  top: 30px;
+  height: 48px;
+}
+
+.module.phone .deck-read {
+  left: 122px;
+  right: 10px;
+  top: 32px;
+  width: auto;
+  height: 26px;
+  font-size: 12px;
+}
+
+.module.phone .deck-transport {
+  left: 122px;
+  right: 10px;
+  top: 66px;
+  width: auto;
+  height: 26px;
+  font-size: 12px;
+}
+
+.module.phone .here {
+  left: 122px;
+  right: 112px;
+  top: 100px;
+  height: 22px;
+  padding: 0;
+  font-size: 12px;
+  justify-content: flex-start;
+}
+
+.module.phone .knob-up,
+.module.phone .knob-down {
+  left: auto;
+  top: 96px;
+  width: 44px;
+  height: 32px;
+}
+
+.module.phone .knob-up {
+  right: 60px;
+}
+
+.module.phone .knob-down {
+  right: 10px;
+}
+
+/* рейка лежит на боку: клавиши в ряд, подписи при этом встают горизонтально */
+.module.phone .rail {
+  left: calc(50% - 46px);
+  top: 6px;
+  height: 340px;
+  transform: rotate(90deg);
 }

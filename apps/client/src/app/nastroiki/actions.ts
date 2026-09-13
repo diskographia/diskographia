@@ -5,10 +5,9 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { failureText } from '@/api/failure';
-import { SESSION_COOKIE, authHeaders } from '@/api/session';
+import { apiSend } from '@/api/server';
+import { SESSION_COOKIE } from '@/api/session';
 import { routes } from '@/routes';
-
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
 
 export interface SettingsState {
   error: string | null;
@@ -18,12 +17,11 @@ export interface SettingsState {
 const SWITCHES = ['notifyChild', 'notifyApplication', 'notifyFeedback', 'notifyCollaborator'] as const;
 
 export async function saveSettings(_state: SettingsState, form: FormData): Promise<SettingsState> {
-  const response = await fetch(`${baseUrl}/notifications/settings`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify(Object.fromEntries(SWITCHES.map((name) => [name, form.get(name) === 'on']))),
-    cache: 'no-store',
-  });
+  const response = await apiSend(
+    '/notifications/settings',
+    'PATCH',
+    Object.fromEntries(SWITCHES.map((name) => [name, form.get(name) === 'on'])),
+  );
 
   if (!response.ok) {
     return { error: await failureText(response), saved: false };
@@ -34,16 +32,30 @@ export async function saveSettings(_state: SettingsState, form: FormData): Promi
   return { error: null, saved: true };
 }
 
-export async function closeAccount(): Promise<void> {
-  const response = await fetch(`${baseUrl}/profiles/me`, {
-    method: 'DELETE',
-    headers: await authHeaders(),
-    cache: 'no-store',
-  });
+export async function changePassword(_state: SettingsState, form: FormData): Promise<SettingsState> {
+  const next = String(form.get('next') ?? '');
 
-  if (response.ok) {
-    (await cookies()).delete(SESSION_COOKIE);
+  if (next !== String(form.get('again') ?? '')) {
+    return { error: 'новый пароль набран по-разному', saved: false };
   }
 
+  const response = await apiSend('/auth/password', 'PATCH', { current: String(form.get('current') ?? ''), next });
+
+  if (!response.ok) {
+    return { error: await failureText(response), saved: false };
+  }
+
+  return { error: null, saved: true };
+}
+
+// закрытие подтверждается паролем: без него сервер откажет
+export async function closeAccount(_state: SettingsState, form: FormData): Promise<SettingsState> {
+  const response = await apiSend('/profiles/me', 'DELETE', { password: String(form.get('password') ?? '') });
+
+  if (!response.ok) {
+    return { error: await failureText(response), saved: false };
+  }
+
+  (await cookies()).delete(SESSION_COOKIE);
   redirect(routes.home());
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { failureText } from '@/api/failure';
+import { request } from '@/api/browser';
 import { Hint } from '@/components/ui/hint';
 
 interface AnnouncePanelProps {
@@ -40,14 +40,10 @@ export function AnnouncePanel({ eventId, daysLeft, applicationsOpen, authed }: A
     setState('sending');
     setError(null);
 
-    const response = await fetch(`/api/events/${eventId}/applications`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ attachedEntityId: null }),
-    });
+    const answer = await request(`/events/${eventId}/applications`, 'POST', { attachedEntityId: null });
 
-    if (!response.ok) {
-      setError(await failureText(response));
+    if (!answer.ok) {
+      setError(answer.error);
       setState('failed');
       return;
     }
@@ -62,7 +58,7 @@ export function AnnouncePanel({ eventId, daysLeft, applicationsOpen, authed }: A
       {applicationsOpen && authed ? (
         <div className="mt-2">
           {state === 'sent' ? (
-            <p>заявка отправлена</p>
+            <p>Заявка отправлена.</p>
           ) : (
             <button type="button" onClick={() => void apply()} disabled={state === 'sending'} className="frame px-2 py-1">
               {state === 'sending' ? 'отправляем' : 'подать участие'}
@@ -70,7 +66,7 @@ export function AnnouncePanel({ eventId, daysLeft, applicationsOpen, authed }: A
           )}
 
           {state === 'failed' ? <p>{error}</p> : null}
-          {state === 'sent' ? <Hint>решение придёт уведомлением</Hint> : null}
+          {state === 'sent' ? <Hint>Решение придёт уведомлением.</Hint> : null}
         </div>
       ) : null}
     </div>

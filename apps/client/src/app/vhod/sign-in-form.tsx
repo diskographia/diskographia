@@ -29,9 +29,9 @@ export function SignInForm() {
         {pending ? 'проверяем' : 'войти'}
       </button>
 
-      {state.error ? <p className="mt-2">{state.error}</p> : null}
+      {state.error ? <p className="mt-2">Ошибка: {state.error}</p> : null}
 
-      <p className="hint mt-2">набор закрыт, учётку заводит платформа</p>
+      <p className="hint mt-2">Набор закрыт, учётку заводит платформа.</p>
     </form>
   );
 }

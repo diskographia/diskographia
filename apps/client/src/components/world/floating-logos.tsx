@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { request } from '@/api/browser';
 import type { ManifestView } from '@/api/types';
 import { EntityGrid } from '@/components/entity/entity-grid';
 import { MarkdownView } from '@/components/entity/markdown-view';
@@ -25,6 +26,7 @@ export function FloatingLogos() {
   const nodes = useRef<(HTMLButtonElement | null)[]>([]);
   const [open, setOpen] = useState(false);
   const [manifest, setManifest] = useState<ManifestView | null>(null);
+  const [missing, setMissing] = useState(false);
 
   useEffect(() => {
     const box = layer.current;
@@ -40,6 +42,16 @@ export function FloatingLogos() {
 
     let last = performance.now();
     let frame = 0;
+
+    const place = () => {
+      bodies.forEach((body, index) => {
+        const node = nodes.current[index];
+
+        if (node) {
+          node.style.transform = `translate3d(${body.x}px, ${body.y}px, 0)`;
+        }
+      });
+    };
 
     const step = (now: number) => {
       const delta = Math.min((now - last) / 1000, 0.05);
@@ -67,24 +79,20 @@ export function FloatingLogos() {
       const gapX = second.x - first.x;
       const gapY = second.y - first.y;
 
+      // столкнулись: разводим по той оси, где перекрытие меньше, и толкаем в разные стороны
       if (Math.abs(gapX) < SIZE && Math.abs(gapY) < SIZE) {
         if (Math.abs(gapX) > Math.abs(gapY)) {
-          first.dx *= -1;
-          second.dx *= -1;
+          const sign = Math.sign(gapX) || 1;
+          first.dx = -Math.abs(first.dx) * sign;
+          second.dx = Math.abs(second.dx) * sign;
         } else {
-          first.dy *= -1;
-          second.dy *= -1;
+          const sign = Math.sign(gapY) || 1;
+          first.dy = -Math.abs(first.dy) * sign;
+          second.dy = Math.abs(second.dy) * sign;
         }
       }
 
-      bodies.forEach((body, index) => {
-        const node = nodes.current[index];
-
-        if (node) {
-          node.style.transform = `translate3d(${body.x}px, ${body.y}px, 0)`;
-        }
-      });
-
+      place();
       frame = requestAnimationFrame(step);
     };
 
@@ -93,14 +101,14 @@ export function FloatingLogos() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  // манифест перечитывается при каждом обращении: его могли включить только что
+  // манифест читается при каждом открытии: его могли включить только что
   const show = useCallback(async () => {
-    const fresh = await fetch('/api/feed/manifest')
-      .then((response) => (response.ok ? (response.json() as Promise<ManifestView | null>) : null))
-      .catch(() => null);
+    const fresh = await request<ManifestView | null>('/feed/manifest');
+    const view = fresh.ok ? fresh.data : null;
 
-    setManifest(fresh);
-    setOpen(!!fresh);
+    setManifest(view);
+    setMissing(!view);
+    setOpen(true);
   }, []);
 
   useEffect(() => {
@@ -111,20 +119,13 @@ export function FloatingLogos() {
     return () => window.removeEventListener(MANIFEST_EVENT, listen);
   }, [show]);
 
-  useEffect(() => {
-    void fetch('/api/feed/manifest')
-      .then((response) => (response.ok ? (response.json() as Promise<ManifestView | null>) : null))
-      .then(setManifest)
-      .catch(() => setManifest(null));
-  }, []);
-
   const article = manifest?.children[0] ?? null;
   const rest = manifest?.children.slice(1) ?? [];
 
   return (
     <>
       {/* слой стоит нулевым: ниже отрицательного нажатие забирает body, а модуль всё равно рисуется поверх */}
-      <div ref={layer} aria-hidden={false} className="pointer-events-none fixed inset-0" data-hold style={{ zIndex: 0 }}>
+      <div ref={layer} className="logos" data-hold>
         {[0, 1].map((index) => (
           <button
             key={index}
@@ -135,27 +136,28 @@ export function FloatingLogos() {
             onClick={() => void show()}
             aria-label="манифест"
             title="манифест Дискографии, нажми"
-            className="absolute left-0 top-0"
-            style={{
-              width: SIZE,
-              height: SIZE,
-              willChange: 'transform',
-              pointerEvents: 'auto',
-            }}
+            className="logo"
+            style={{ width: SIZE, height: SIZE }}
           >
             <img src={`/decor/logo-${index + 1}.webp`} alt="" className="h-full w-full" />
           </button>
         ))}
       </div>
 
-      <Modal title={article?.title ?? manifest?.title ?? 'манифест'} open={open && !!manifest} onClose={() => setOpen(false)} half>
-        <MarkdownView source={article?.descriptionMd || manifest?.descriptionMd || ''} />
+      <Modal title={article?.title ?? manifest?.title ?? 'манифест'} open={open} onClose={() => setOpen(false)} half>
+        {missing ? (
+          <p>Манифест пока не опубликован.</p>
+        ) : (
+          <>
+            <MarkdownView source={article?.descriptionMd || manifest?.descriptionMd || ''} />
 
-        {rest.length > 0 ? (
-          <div className="mt-3">
-            <EntityGrid items={rest.map((card) => ({ card }))} />
-          </div>
-        ) : null}
+            {rest.length > 0 ? (
+              <div className="mt-3">
+                <EntityGrid items={rest.map((card) => ({ card }))} />
+              </div>
+            ) : null}
+          </>
+        )}
       </Modal>
     </>
   );

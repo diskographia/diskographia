@@ -1,5 +1,7 @@
 import sharp from 'sharp';
 
+// экраны из макета в координаты спрайта модуля: node tools/measure/greenbox.mjs сурсы/рамка-модуль.png сурсы/макет.jpg
+
 async function green(file, width) {
   const { data, info } = await sharp(file).resize({ width, fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const is = (x, y) => {
@@ -21,8 +23,8 @@ async function green(file, width) {
   return { x0: x0 / info.width, y0: y0 / info.height, x1: (x1 + 1) / info.width, y1: (y1 + 1) / info.height, w: info.width, h: info.height };
 }
 
-const png = await green("D:/diskographia/сурсы/рамка-модуль.png", 600);
-const jpg = await green("D:/diskographia/сурсы/макет.jpg", 900);
+const png = await green(process.argv[2], 600);
+const jpg = await green(process.argv[3], 900);
 
 const p = (v) => (v * 100).toFixed(2);
 console.log(`рамка в png:   ${p(png.x0)}% ${p(png.y0)}% .. ${p(png.x1)}% ${p(png.y1)}%  пропорция ${(((png.x1 - png.x0) * 8192) / ((png.y1 - png.y0) * 5534)).toFixed(3)}`);

@@ -1,28 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { EntityCard } from '@diskographia/shared';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 
 import { DATABASE, type Database } from '../../database/database.module.js';
 import { entities, entityDisplayAuthors, entityMedia, entityTags, files, profiles, tags } from '../../database/schema/index.js';
 
-export interface EntityCard {
-  id: string;
-  kind: string;
-  title: string;
-  slug: string;
-  descriptionMd: string;
-  feedbackCount: number;
-  viewerCount: number;
-  createdAt: string;
-  ownerHandle: string;
-  coverPath: string | null;
-  coverWidth: number | null;
-  coverHeight: number | null;
-  displayAuthor: { name: string; city: string | null; country: string | null } | null;
-  tags: string[];
-  deleted: boolean;
-}
-
-const TOMBSTONE_TITLE = 'объект удалён';
+const TOMBSTONE_TITLE = 'предмет удалён';
 
 type EntityRow = typeof entities.$inferSelect;
 

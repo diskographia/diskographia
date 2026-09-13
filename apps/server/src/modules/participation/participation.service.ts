@@ -92,7 +92,7 @@ export class ParticipationService implements OnApplicationBootstrap, OnApplicati
         .limit(1);
 
       if (!work || work.ownerId !== profileId) {
-        throw new BadRequestException('приложить можно только свой объект');
+        throw new BadRequestException('приложить можно только свой предмет');
       }
     }
 
@@ -124,6 +124,7 @@ export class ParticipationService implements OnApplicationBootstrap, OnApplicati
       eventTitle: event.title,
       profileId,
       withWork: !!attachedEntityId,
+      target: { handle: event.ownerHandle, slug: event.slug },
     });
 
     return row;
@@ -221,7 +222,8 @@ export class ParticipationService implements OnApplicationBootstrap, OnApplicati
       })
       .from(eventParticipants)
       .innerJoin(profiles, eq(profiles.id, eventParticipants.profileId))
-      .where(and(eq(eventParticipants.eventId, eventId), sql`${eventParticipants.applicationStatus} is not null`));
+      .where(and(eq(eventParticipants.eventId, eventId), sql`${eventParticipants.applicationStatus} is not null`))
+      .orderBy(desc(eventParticipants.createdAt));
   }
 
   // организатор решает, брать ли приложенную работу
@@ -271,6 +273,7 @@ export class ParticipationService implements OnApplicationBootstrap, OnApplicati
       eventTitle: event.title,
       accepted: accept,
       withWork,
+      target: { handle: event.ownerHandle, slug: event.slug },
     });
 
     return resolved;
@@ -328,12 +331,15 @@ export class ParticipationService implements OnApplicationBootstrap, OnApplicati
     const [event] = await this.db
       .select({
         ownerId: entities.ownerId,
+        ownerHandle: profiles.handle,
         title: entities.title,
+        slug: entities.slug,
         applicationsOpen: entityEvents.applicationsOpen,
         applicationTtlDays: entityEvents.applicationTtlDays,
       })
       .from(entities)
       .innerJoin(entityEvents, eq(entityEvents.entityId, entities.id))
+      .innerJoin(profiles, eq(profiles.id, entities.ownerId))
       .where(and(eq(entities.id, eventId), isNull(entities.deletedAt)))
       .limit(1);
 

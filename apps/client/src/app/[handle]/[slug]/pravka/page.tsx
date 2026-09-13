@@ -1,58 +1,51 @@
 import { notFound, redirect } from 'next/navigation';
 
-import { apiGet, fileUrl } from '@/api/client';
 import { parseHandle } from '@/api/handle';
-import { authHeaders, currentIdentity } from '@/api/session';
+import { apiGet } from '@/api/server';
+import { fileUrl } from '@/api/urls';
+import type { Abilities, EntityCard, EntityPage, ScheduleEntry } from '@/api/types';
 import { currentViewer } from '@/api/viewer';
-import type { EntityCard, EntityPage, ScheduleEntry } from '@/api/types';
+import { routes } from '@/routes';
 
 import { EditForm } from './edit-form';
-import { routes } from '@/routes';
 
 interface PageProps {
   params: Promise<{ handle: string; slug: string }>;
 }
 
-interface Abilities {
-  owner: boolean;
-  edit: boolean;
-  pin: boolean;
-}
-
 export default async function EditEntityPage({ params }: PageProps) {
-  const { handle, slug } = await params;
+  const [{ handle, slug }, viewer] = await Promise.all([params, currentViewer()]);
   const nickname = parseHandle(handle);
 
   if (!nickname) {
     notFound();
   }
 
-  const identity = await currentIdentity();
-
-  if (!identity) {
+  if (!viewer) {
     redirect(routes.signIn());
   }
 
-  const headers = await authHeaders();
-  const page = await apiGet<EntityPage>(`/profiles/${nickname}/objects/${slug}`, { headers }).catch(() => null);
+  const page = await apiGet<EntityPage>(`/profiles/${nickname}/objects/${slug}`).catch(() => null);
 
   if (!page) {
     notFound();
   }
 
-  const abilities = await apiGet<Abilities>(`/entities/${page.entity.id}/abilities`, { headers }).catch(() => null);
+  const abilities = await apiGet<Abilities>(`/entities/${page.entity.id}/abilities`).catch(() => null);
 
   // кто не может править, тот видит обычную страницу
   if (!abilities?.edit) {
     redirect(routes.entity(nickname, slug));
   }
 
-  const owned = await apiGet<EntityCard[]>('/entities/mine', { headers }).catch(() => []);
-  const schedule =
+  const [owned, schedule] = await Promise.all([
+    apiGet<EntityCard[]>('/entities/mine').catch(() => []),
     page.entity.kind === 'event'
-      ? await apiGet<ScheduleEntry[]>(`/feed/events/${page.entity.id}/schedule`).catch(() => [])
-      : [];
-  const cover = page.media.find((item) => item.media.kind === 'image');
+      ? apiGet<ScheduleEntry[]>(`/feed/events/${page.entity.id}/schedule`).catch(() => [])
+      : Promise.resolve([]),
+  ]);
+
+  const cover = page.media.find((item) => item.media.kind === 'image' && item.file);
 
   return (
     <EditForm
@@ -64,7 +57,7 @@ export default async function EditEntityPage({ params }: PageProps) {
       owned={owned}
       canPin={abilities.pin}
       owner={abilities.owner}
-      platform={!!(await currentViewer())?.isAdmin}
+      platform={viewer.isAdmin}
       schedule={schedule}
     />
   );

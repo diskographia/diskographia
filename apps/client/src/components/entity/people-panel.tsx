@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
+import { request } from '@/api/browser';
 import type { EventPeople } from '@/api/types';
 import { Modal } from '@/components/modal';
 import { Hint } from '@/components/ui/hint';
@@ -22,25 +23,19 @@ export function PeoplePanel({ eventId, linked, showVisitors }: PeoplePanelProps)
   const [tab, setTab] = useState<Tab>('participants');
   const [people, setPeople] = useState<EventPeople>({ participants: [], visitors: [] });
 
-  const read = useCallback(async (): Promise<EventPeople> => {
-    const response = await fetch(`/api/events/${eventId}/people`);
-
-    return response.ok ? ((await response.json()) as EventPeople) : { participants: [], visitors: [] };
-  }, [eventId]);
-
   useEffect(() => {
     let alive = true;
 
-    void read().then((rows) => {
-      if (alive) {
-        setPeople(rows);
+    void request<EventPeople>(`/events/${eventId}/people`).then((answer) => {
+      if (alive && answer.data) {
+        setPeople(answer.data);
       }
     });
 
     return () => {
       alive = false;
     };
-  }, [read]);
+  }, [eventId]);
 
   if (people.participants.length === 0 && !(showVisitors && people.visitors.length > 0)) {
     return null;
@@ -76,7 +71,7 @@ export function PeoplePanel({ eventId, linked, showVisitors }: PeoplePanelProps)
 
         {tab === 'participants' || !showVisitors ? (
           <>
-            <Hint>здесь авторы выставленных работ</Hint>
+            <Hint>Здесь авторы выставленных работ.</Hint>
 
             <ul className="mt-2">
               {people.participants.map((person) => (
@@ -86,7 +81,7 @@ export function PeoplePanel({ eventId, linked, showVisitors }: PeoplePanelProps)
 
                   <ul className="mt-1">
                     {person.works.map((work) => (
-                      <li key={work.slug}>
+                      <li key={`${work.ownerHandle}/${work.slug}`}>
                         <Link href={routes.entity(work.ownerHandle, work.slug)} className="underline">
                           {work.title}
                         </Link>
@@ -97,11 +92,11 @@ export function PeoplePanel({ eventId, linked, showVisitors }: PeoplePanelProps)
               ))}
             </ul>
 
-            {people.participants.length === 0 ? <p>работ пока не выставили</p> : null}
+            {people.participants.length === 0 ? <p>Работ пока не выставили.</p> : null}
           </>
         ) : (
           <>
-            <Hint>отметившиеся «пойду». участниками они не считаются</Hint>
+            <Hint>Отметившиеся «пойду». Участниками они не считаются.</Hint>
 
             <ul className="mt-2">
               {people.visitors.map((handle) => (
@@ -117,7 +112,7 @@ export function PeoplePanel({ eventId, linked, showVisitors }: PeoplePanelProps)
               ))}
             </ul>
 
-            {people.visitors.length === 0 ? <p>никто не отметился</p> : null}
+            {people.visitors.length === 0 ? <p>Никто не отметился.</p> : null}
           </>
         )}
       </Modal>

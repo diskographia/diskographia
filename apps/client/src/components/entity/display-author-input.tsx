@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import type { EntityDetail } from '@/api/types';
 
-// автор без аккаунта: объект остаётся за платформой, а показывается он
+// автор без аккаунта: предмет остаётся за платформой, а показывается он
 export function DisplayAuthorInput({ initial }: { initial: EntityDetail['displayAuthor'] }) {
   const [on, setOn] = useState(!!initial);
 
@@ -18,9 +18,28 @@ export function DisplayAuthorInput({ initial }: { initial: EntityDetail['display
 
       {on ? (
         <div className="mt-2">
-          <input name="displayAuthorName" defaultValue={initial?.name ?? ''} placeholder="имя" required className="frame mb-1 block w-full p-1" />
-          <input name="displayAuthorCity" defaultValue={initial?.city ?? ''} placeholder="город" className="frame mb-1 block w-full p-1" />
-          <input name="displayAuthorCountry" defaultValue={initial?.country ?? ''} placeholder="страна" className="frame block w-full p-1" />
+          <input
+            name="displayAuthorName"
+            defaultValue={initial?.name ?? ''}
+            placeholder="имя"
+            aria-label="имя"
+            required
+            className="frame mb-1 block w-full p-1"
+          />
+          <input
+            name="displayAuthorCity"
+            defaultValue={initial?.city ?? ''}
+            placeholder="город"
+            aria-label="город"
+            className="frame mb-1 block w-full p-1"
+          />
+          <input
+            name="displayAuthorCountry"
+            defaultValue={initial?.country ?? ''}
+            placeholder="страна"
+            aria-label="страна"
+            className="frame block w-full p-1"
+          />
         </div>
       ) : (
         <input type="hidden" name="displayAuthorName" value="" />

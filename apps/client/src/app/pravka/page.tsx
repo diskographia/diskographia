@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 
-import { apiGet } from '@/api/client';
+import { apiGet } from '@/api/server';
 import type { ProfileView } from '@/api/types';
 import { requireService } from '@/api/viewer';
 

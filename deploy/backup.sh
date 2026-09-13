@@ -17,8 +17,9 @@ UPLOADS="${UPLOADS_HOST_DIR:-./uploads}"
 
 mkdir -p "$OUT"
 
+# дамп с --clean, чтобы возврат стирал текущие таблицы, а не наслаивался на них
 docker compose --env-file .env.production exec -T postgres \
-  pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > "$OUT/db-$STAMP.sql.gz"
+  pg_dump -U "$POSTGRES_USER" --clean --if-exists "$POSTGRES_DB" | gzip > "$OUT/db-$STAMP.sql.gz"
 
 tar czf "$OUT/uploads-$STAMP.tar.gz" -C "$(dirname "$UPLOADS")" "$(basename "$UPLOADS")"
 

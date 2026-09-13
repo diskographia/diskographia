@@ -3,11 +3,19 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { request } from '@/api/browser';
 import type { ScheduleEntry } from '@/api/types';
-import { failureText } from '@/api/failure';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Modal } from '@/components/modal';
 
 const dayLabel = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+function isoOrNull(value: FormDataEntryValue | null): string | null {
+  const text = String(value ?? '').trim();
+  const moment = new Date(text);
+
+  return text && !Number.isNaN(moment.getTime()) ? moment.toISOString() : null;
+}
 
 export function ScheduleManager({ eventId, entries }: { eventId: string; entries: ScheduleEntry[] }) {
   const router = useRouter();
@@ -19,31 +27,29 @@ export function ScheduleManager({ eventId, entries }: { eventId: string; entries
     setBusy(true);
     setError(null);
 
-    const response = await fetch(`/api/feed/events/${eventId}/schedule`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        startsAt: new Date(String(form.get('startsAt'))).toISOString(),
-        endsAt: form.get('endsAt') ? new Date(String(form.get('endsAt'))).toISOString() : null,
-        title: String(form.get('title')),
-        shortMd: String(form.get('shortMd') ?? ''),
-        fullMd: String(form.get('fullMd') ?? ''),
-      }),
+    const answer = await request(`/feed/events/${eventId}/schedule`, 'POST', {
+      startsAt: isoOrNull(form.get('startsAt')) ?? '',
+      endsAt: isoOrNull(form.get('endsAt')),
+      title: String(form.get('title') ?? '').trim(),
+      shortMd: String(form.get('shortMd') ?? ''),
+      fullMd: String(form.get('fullMd') ?? ''),
     });
 
-    if (!response.ok) {
-      setError(await failureText(response));
+    setBusy(false);
+
+    if (!answer.ok) {
+      setError(answer.error);
+      return;
     }
 
-    setBusy(false);
     router.refresh();
   }
 
   async function remove(entryId: string): Promise<void> {
-    const response = await fetch(`/api/feed/schedule/${entryId}`, { method: 'DELETE' });
+    const answer = await request(`/feed/schedule/${entryId}`, 'DELETE');
 
-    if (!response.ok) {
-      setError(await failureText(response));
+    if (!answer.ok) {
+      setError(answer.error);
       return;
     }
 
@@ -57,7 +63,7 @@ export function ScheduleManager({ eventId, entries }: { eventId: string; entries
       </button>
 
       <Modal title="расписание ивента" open={open} onClose={() => setOpen(false)} half>
-        {error ? <p>ошибка: {error}</p> : null}
+        {error ? <p>Ошибка: {error}</p> : null}
 
         <ul>
           {entries.map((entry) => (
@@ -65,21 +71,39 @@ export function ScheduleManager({ eventId, entries }: { eventId: string; entries
               <span className="flex-1">
                 {dayLabel.format(new Date(entry.startsAt))} {entry.title}
               </span>
-              <button type="button" onClick={() => void remove(entry.id)} className="frame px-2">
-                убрать
-              </button>
+              <ConfirmButton
+                label="убрать"
+                title="убрать запись"
+                question={<p>Запись «{entry.title}» исчезнет из расписания.</p>}
+                onConfirm={() => remove(entry.id)}
+              />
             </li>
           ))}
         </ul>
 
-        {entries.length === 0 ? <p>записей нет</p> : null}
+        {entries.length === 0 ? <p>Записей нет.</p> : null}
 
         <form action={add} className="frame mt-3 p-2">
-          <input type="datetime-local" name="startsAt" required className="frame mb-1 block w-full p-1" />
-          <input type="datetime-local" name="endsAt" className="frame mb-1 block w-full p-1" />
-          <input name="title" placeholder="заголовок" required className="frame mb-1 block w-full p-1" />
-          <input name="shortMd" placeholder="кратко, показывается при наведении" className="frame mb-1 block w-full p-1" />
-          <textarea name="fullMd" placeholder="подробно, markdown" rows={4} className="frame mb-1 block w-full p-1" />
+          <label className="block">
+            начало
+            <input type="datetime-local" name="startsAt" required className="frame mb-1 block w-full p-1" />
+          </label>
+          <label className="block">
+            конец, можно пусто
+            <input type="datetime-local" name="endsAt" className="frame mb-1 block w-full p-1" />
+          </label>
+          <label className="block">
+            заголовок
+            <input name="title" required className="frame mb-1 block w-full p-1" />
+          </label>
+          <label className="block">
+            кратко, показывается на плитке дня
+            <input name="shortMd" className="frame mb-1 block w-full p-1" />
+          </label>
+          <label className="block">
+            подробно, markdown
+            <textarea name="fullMd" rows={4} className="frame mb-1 block w-full p-1" />
+          </label>
           <button type="submit" disabled={busy} className="frame px-2 py-1">
             добавить
           </button>

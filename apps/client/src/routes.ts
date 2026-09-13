@@ -16,6 +16,7 @@ export interface SearchParams {
   q?: string;
   tag?: string;
   kind?: string;
+  page?: string;
 }
 
 export const routes = {

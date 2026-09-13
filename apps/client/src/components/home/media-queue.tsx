@@ -2,100 +2,87 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import { previewUrl } from '@/api/client';
+import { fileUrl, previewUrl } from '@/api/urls';
 import type { EntityCard, MediaItem } from '@/api/types';
 import { Modal } from '@/components/modal';
 import { StaticScreen } from '@/components/world/static-screen';
 import { routes } from '@/routes';
 
-const StreamFrame = dynamic(() => import('./stream-frame').then((module) => module.StreamFrame), { ssr: false });
+import { useCarousel } from './carousel';
 
-// интервал не согласован
-const INTERVAL_MS = 5000;
+const StreamFrame = dynamic(() => import('./stream-frame').then((module) => module.StreamFrame), { ssr: false });
 
 interface MediaQueueProps {
   media: MediaItem[];
   objects?: EntityCard[];
 }
 
-type Slide = { kind: 'stream' | 'image'; item: MediaItem } | { kind: 'object'; card: EntityCard };
+type Slide = { kind: 'stream' | 'video' | 'image'; item: MediaItem } | { kind: 'object'; card: EntityCard };
 
-
-// стрим стоит первым и сам не листается, второстепенная очередь из картинок и объектов крутится пока стрима нет
+// стрим стоит первым и сам не листается, второстепенная очередь из картинок и предметов крутится пока стрима нет
 export function MediaQueue({ media, objects = [] }: MediaQueueProps) {
   const primary: Slide[] = media
-    .filter((item) => item.media.kind === 'embed' || item.media.kind === 'video')
-    .map((item) => ({ kind: 'stream', item }));
+    .filter((item) => item.media.kind === 'embed' || (item.media.kind === 'video' && item.file))
+    .map((item) => ({ kind: item.media.kind === 'embed' ? 'stream' : 'video', item }));
 
   const secondary: Slide[] = [
-    ...media.filter((item) => item.media.kind === 'image').map((item): Slide => ({ kind: 'image', item })),
+    ...media.filter((item) => item.media.kind === 'image' && item.file).map((item): Slide => ({ kind: 'image', item })),
     ...objects.map((card): Slide => ({ kind: 'object', card })),
   ];
 
-  const [index, setIndex] = useState(0);
-  const [fullscreen, setFullscreen] = useState(false);
-
-  const onPrimary = index < primary.length;
-
-  useEffect(() => {
-    if (onPrimary || secondary.length < 2) {
-      return;
-    }
-
-    const timer = setInterval(
-      () => setIndex((value) => primary.length + ((value - primary.length + 1) % secondary.length)),
-      INTERVAL_MS,
-    );
-
-    return () => clearInterval(timer);
-  }, [onPrimary, secondary.length, primary.length]);
-
   const slides = [...primary, ...secondary];
+  const [fullscreen, setFullscreen] = useState(false);
+  const { index, next, hold } = useCarousel(slides.length, (at) => at >= primary.length);
 
   if (slides.length === 0) {
     return <StaticScreen>no_signal</StaticScreen>;
   }
 
   const current = slides[index % slides.length]!;
-  const advance = () => setIndex((value) => (value + 1) % slides.length);
-
   const stream = current.kind === 'stream' ? current.item.media.embedUrl : null;
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center">
+    <div className="relative flex h-full w-full items-center justify-center" {...hold}>
       {stream ? (
-        <button
-          type="button"
-          onClick={() => setFullscreen(true)}
-          title="нажми, чтобы развернуть трансляцию"
-          className="h-full w-full"
-        >
-          {fullscreen ? (
-            <div className="placeholder h-full w-full" />
-          ) : (
-            <StreamFrame url={stream} className="pointer-events-none h-full w-full" />
-          )}
-        </button>
+        <>
+          {fullscreen ? null : <StreamFrame url={stream} className="h-full w-full" />}
+          <button
+            type="button"
+            onClick={() => setFullscreen(true)}
+            title="развернуть трансляцию на полэкрана"
+            className="frame queue-expand px-2 py-1"
+          >
+            развернуть
+          </button>
+        </>
+      ) : current.kind === 'video' && current.item.file ? (
+        <video
+          controls
+          src={fileUrl(current.item.file.path) ?? undefined}
+          title={current.item.media.title ?? 'видео'}
+          className="max-h-full max-w-full"
+        />
       ) : current.kind === 'object' ? (
         <Link
           href={routes.entity(current.card.ownerHandle, current.card.slug)}
           className="relative flex h-full w-full items-center justify-center"
+          title={`открыть: ${current.card.title}`}
         >
           {previewUrl(current.card.coverPath) ? (
-            <img src={previewUrl(current.card.coverPath)!} alt="" className="max-h-full w-auto max-w-full object-contain" />
-          ) : (
-            <div className="placeholder h-full w-full" />
-          )}
-          <span className="frame absolute bottom-0 left-0 px-1" style={{ background: '#fff' }}>
-            {current.card.title}
-          </span>
+            <img
+              src={previewUrl(current.card.coverPath)!}
+              alt={current.card.title}
+              className="max-h-full w-auto max-w-full object-contain"
+            />
+          ) : null}
+          <span className="tape-name">{current.card.title}</span>
         </Link>
       ) : current.kind === 'image' && current.item.file ? (
         <img
           src={previewUrl(current.item.file.path) ?? ''}
-          alt=""
+          alt={current.item.media.title ?? ''}
           className="max-h-full w-auto max-w-full object-contain"
         />
       ) : (
@@ -105,11 +92,10 @@ export function MediaQueue({ media, objects = [] }: MediaQueueProps) {
       {slides.length > 1 ? (
         <button
           type="button"
-          onClick={advance}
+          onClick={next}
           aria-label="следующее"
           title={`следующее, всего ${slides.length}`}
-          className="frame absolute right-0 top-1/2 -translate-y-1/2 px-2 py-1"
-          style={{ background: '#fff' }}
+          className="tape-next"
         >
           &rsaquo;
         </button>

@@ -3,18 +3,17 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { failureText } from '@/api/failure';
+import { request } from '@/api/browser';
 import { Modal } from '@/components/modal';
 import { routes } from '@/routes';
 
 interface DeleteButtonProps {
   entityId: string;
   title: string;
-  handle: string;
 }
 
-// удаление мягкое: объект пропадает у всех, в чужих контейнерах остаётся след
-export function DeleteButton({ entityId, title, handle }: DeleteButtonProps) {
+// удаление мягкое: предмет пропадает у всех, в чужих контейнерах остаётся след, вернуть можно из корзины
+export function DeleteButton({ entityId, title }: DeleteButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -24,15 +23,15 @@ export function DeleteButton({ entityId, title, handle }: DeleteButtonProps) {
     setBusy(true);
     setError(null);
 
-    const response = await fetch(`/api/entities/${entityId}`, { method: 'DELETE' });
+    const answer = await request(`/entities/${entityId}`, 'DELETE');
 
-    if (!response.ok) {
-      setError(await failureText(response));
+    if (!answer.ok) {
+      setError(answer.error);
       setBusy(false);
       return;
     }
 
-    router.push(routes.profile(handle));
+    router.push(routes.mine());
     router.refresh();
   }
 
@@ -42,12 +41,12 @@ export function DeleteButton({ entityId, title, handle }: DeleteButtonProps) {
         удалить
       </button>
 
-      <Modal title="удалить объект" open={open} onClose={() => setOpen(false)}>
+      <Modal title="удалить предмет" open={open} onClose={() => setOpen(false)}>
         <p>«{title}» пропадёт из поиска, с главной и из вашего инвентаря.</p>
-        <p>Там, где его положили другие, останется след «объект удалён».</p>
-        <p>Из интерфейса это не откатывается: вернуть можно только правкой базы.</p>
+        <p>Там, где его положили другие, останется след «предмет удалён».</p>
+        <p>Вернуть его можно из корзины.</p>
 
-        {error ? <p>ошибка: {error}</p> : null}
+        {error ? <p>Ошибка: {error}</p> : null}
 
         <div className="mt-3 flex gap-1">
           <button type="button" onClick={() => void remove()} disabled={busy} className="frame px-2 py-1">

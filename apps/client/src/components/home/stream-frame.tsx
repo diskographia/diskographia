@@ -5,7 +5,11 @@ export function StreamFrame({ url, className }: { url: string; className?: strin
   const source = embedSource(url, window.location.hostname);
 
   if (!source) {
-    return <div className="placeholder h-full w-full" />;
+    return (
+      <div className="placeholder flex h-full w-full items-center justify-center">
+        <span className="hint">Ссылка на трансляцию не разобрана: нужен youtube или twitch.</span>
+      </div>
+    );
   }
 
   return (
@@ -19,23 +23,31 @@ export function StreamFrame({ url, className }: { url: string; className?: strin
   );
 }
 
+const YOUTUBE_PATHS = ['live', 'shorts', 'embed', 'v'];
+
+// понимаются обычные, короткие и живые ссылки youtube и каналы twitch
 export function embedSource(url: string, pageHost: string): string | null {
   try {
     const parsed = new URL(url);
-    const host = parsed.hostname.replace(/^www\./, '');
+    const host = parsed.hostname.replace(/^www\./, '').replace(/^m\./, '');
+    const parts = parsed.pathname.split('/').filter(Boolean);
 
-    if (host === 'youtube.com' || host === 'm.youtube.com') {
-      const id = parsed.searchParams.get('v');
-      return id ? `https://www.youtube.com/embed/${id}` : null;
+    if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      const id = parsed.searchParams.get('v') ?? (parts[0] && YOUTUBE_PATHS.includes(parts[0]) ? parts[1] : undefined);
+
+      return id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}` : null;
     }
 
     if (host === 'youtu.be') {
-      return `https://www.youtube.com/embed/${parsed.pathname.slice(1)}`;
+      return parts[0] ? `https://www.youtube.com/embed/${encodeURIComponent(parts[0])}` : null;
     }
 
     if (host === 'twitch.tv') {
-      const channel = parsed.pathname.split('/').filter(Boolean)[0];
-      return channel ? `https://player.twitch.tv/?channel=${channel}&parent=${pageHost}` : null;
+      if (parts[0] === 'videos' && parts[1]) {
+        return `https://player.twitch.tv/?video=${encodeURIComponent(parts[1])}&parent=${pageHost}`;
+      }
+
+      return parts[0] ? `https://player.twitch.tv/?channel=${encodeURIComponent(parts[0])}&parent=${pageHost}` : null;
     }
 
     return null;

@@ -20,7 +20,7 @@ export default async function SignInPage() {
             </button>
           </form>
         }
-        info={<Hint>служебные адреса собраны в полосе сверху</Hint>}
+        info={<Hint>Служебные адреса собраны в полосе «меню» сверху слева.</Hint>}
       />
     );
   }
@@ -29,7 +29,7 @@ export default async function SignInPage() {
     <ListScreen
       title="вход"
       list={<SignInForm />}
-      info={<Hint>набор закрыт, учётку заводит платформа</Hint>}
+      info={<Hint>Набор закрыт, учётку заводит платформа.</Hint>}
     />
   );
 }

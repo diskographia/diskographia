@@ -103,7 +103,7 @@ export class SearchService {
       .offset((page - 1) * perPage);
   }
 
-  // фасеты для боковых фильтров: сколько объектов по каждому тегу нашлось
+  // фасеты для боковых фильтров: сколько предметов по каждому тегу нашлось
   async tagFacets(limit = readEnv().SEARCH_TAG_FACETS) {
     return this.db
       .select({ name: tags.name, total: sql<number>`count(*)::int` })

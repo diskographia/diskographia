@@ -89,23 +89,38 @@ jobs:
           DATABASE_URL: postgresql://diskographia:diskographia@localhost:5432/diskographia
           JWT_SECRET: ${{ github.sha }}${{ github.sha }}
 
+  # боевые образы: собираются здесь и кладутся в ghcr.io, сервер их только тянет.
+  # адреса клиента вшиваются в сборку, поэтому берутся из переменных репозитория (settings, variables),
+  # без них подставляются значения из .env.production.example
   images:
-    name: образы
+    name: образы в ghcr.io
     needs: [check, migrations]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
 
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: образ сервера
         uses: docker/build-push-action@v6
         with:
           context: .
           file: apps/server/Dockerfile
-          push: false
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/diskographia-server:latest
+            ghcr.io/${{ github.repository_owner }}/diskographia-server:sha-${{ github.sha }}
           cache-from: type=gha,scope=server
           cache-to: type=gha,mode=max,scope=server
 
@@ -114,17 +129,20 @@ jobs:
         with:
           context: .
           file: apps/client/Dockerfile
-          push: false
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/diskographia-client:latest
+            ghcr.io/${{ github.repository_owner }}/diskographia-client:sha-${{ github.sha }}
           cache-from: type=gha,scope=client
           cache-to: type=gha,mode=max,scope=client
           build-args: |
-            NEXT_PUBLIC_API_URL=http://localhost:4000/api
-            NEXT_PUBLIC_UPLOADS_URL=http://localhost:4000/uploads
-            NEXT_PUBLIC_PLATFORM_HANDLE=discography
-            NEXT_PUBLIC_HOME_SELECTION_SLUG=home-selection
-            NEXT_PUBLIC_HOME_SHOWCASE_SLUG=home-showcase
-            NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG=manifest
-            NEXT_PUBLIC_DEMO_MODE=true
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://diskographia.ru/api' }}
+            NEXT_PUBLIC_UPLOADS_URL=${{ vars.NEXT_PUBLIC_UPLOADS_URL || 'https://files.diskographia.ru' }}
+            NEXT_PUBLIC_PLATFORM_HANDLE=${{ vars.NEXT_PUBLIC_PLATFORM_HANDLE || 'discography' }}
+            NEXT_PUBLIC_HOME_SELECTION_SLUG=${{ vars.NEXT_PUBLIC_HOME_SELECTION_SLUG || 'home-selection' }}
+            NEXT_PUBLIC_HOME_SHOWCASE_SLUG=${{ vars.NEXT_PUBLIC_HOME_SHOWCASE_SLUG || 'home-showcase' }}
+            NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG=${{ vars.NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG || 'manifest' }}
+            NEXT_PUBLIC_DEMO_MODE=${{ vars.NEXT_PUBLIC_DEMO_MODE || 'true' }}
 
   stand:
     name: разбор стенда

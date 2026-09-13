@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 export interface Track {
   id: string;
@@ -27,12 +27,23 @@ interface PlayerValue {
   toggle: () => void;
   previous: () => void;
   next: () => void;
-  restart: () => void;
   seek: (seconds: number) => void;
   setVolume: (level: number) => void;
 }
 
 const PlayerContext = createContext<PlayerValue | null>(null);
+
+const VOLUME_KEY = 'diskographia-volume';
+
+function storedVolume(): number {
+  try {
+    const value = Number(localStorage.getItem(VOLUME_KEY));
+
+    return Number.isFinite(value) && value > 0 && value <= 1 ? value : 1;
+  } catch {
+    return 1;
+  }
+}
 
 // очередь строго одна и всегда зациклена: сет ивента не перемешивается с сетом капсулы
 export function PlayerProvider({ children }: { children: ReactNode }) {
@@ -43,11 +54,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setLevel] = useState(1);
+  // громкость видна только в модалке, поэтому разница между сервером и браузером в разметку не попадает
+  const [volume, setLevel] = useState(() => (typeof window === 'undefined' ? 1 : storedVolume()));
+
+  useEffect(() => {
+    if (audio.current) {
+      audio.current.volume = volume;
+    }
+  }, [volume]);
 
   const offer = useCallback((source: string, tracks: Track[]) => {
     setOffered((previous) =>
-      previous?.source === source && previous.tracks.length === tracks.length ? previous : { source, tracks },
+      previous?.source === source && previous.tracks.every((track, index) => track.id === tracks[index]?.id)
+        ? previous
+        : { source, tracks },
     );
   }, []);
 
@@ -123,13 +143,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const next = useCallback(() => shift(1), [shift]);
   const previous = useCallback(() => shift(-1), [shift]);
 
-  const restart = useCallback(() => {
-    if (audio.current) {
-      audio.current.currentTime = 0;
-      setPosition(0);
-    }
-  }, []);
-
   const seek = useCallback((seconds: number) => {
     if (audio.current) {
       audio.current.currentTime = seconds;
@@ -138,12 +151,36 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setVolume = useCallback((level: number) => {
-    setLevel(level);
+    const clamped = Math.max(0, Math.min(1, level));
+
+    setLevel(clamped);
 
     if (audio.current) {
-      audio.current.volume = level;
+      audio.current.volume = clamped;
+    }
+
+    try {
+      localStorage.setItem(VOLUME_KEY, String(clamped));
+    } catch {
+      // без localStorage громкость живёт до перезагрузки
     }
   }, []);
+
+  // экран блокировки и наушники управляют тем же плеером
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) {
+      return;
+    }
+
+    navigator.mediaSession.metadata = current
+      ? new MediaMetadata({ title: current.title, artist: 'disk64.zip' })
+      : null;
+    navigator.mediaSession.playbackState = current ? (playing ? 'playing' : 'paused') : 'none';
+    navigator.mediaSession.setActionHandler('play', () => play());
+    navigator.mediaSession.setActionHandler('pause', pause);
+    navigator.mediaSession.setActionHandler('previoustrack', previous);
+    navigator.mediaSession.setActionHandler('nexttrack', next);
+  }, [current, playing, play, pause, previous, next]);
 
   const value = useMemo(
     () => ({
@@ -160,28 +197,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       toggle,
       previous,
       next,
-      restart,
       seek,
       setVolume,
     }),
-    [
-      offered,
-      queue,
-      current,
-      playing,
-      position,
-      duration,
-      volume,
-      offer,
-      play,
-      pause,
-      toggle,
-      previous,
-      next,
-      restart,
-      seek,
-      setVolume,
-    ],
+    [offered, queue, current, playing, position, duration, volume, offer, play, pause, toggle, previous, next, seek, setVolume],
   );
 
   return (

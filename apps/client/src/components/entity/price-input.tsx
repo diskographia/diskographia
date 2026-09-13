@@ -31,8 +31,8 @@ export function PriceInput({ product }: { product: EntityDetail['product'] }) {
           />
         </label>
       ) : (
-        <div className="flex gap-1">
-          <label className="w-2/3">
+        <div className="flex flex-wrap gap-1">
+          <label className="min-w-40 flex-[2_1_10em]">
             сумма
             <input
               type="number"
@@ -44,13 +44,14 @@ export function PriceInput({ product }: { product: EntityDetail['product'] }) {
               className="frame block w-full p-1"
             />
           </label>
-          <label className="w-1/3">
-            валюта
+          <label className="min-w-24 flex-[1_1_6em]">
+            валюта, три буквы
             <input
               name="priceCurrency"
               required
               maxLength={3}
               minLength={3}
+              pattern="[A-Za-z]{3}"
               defaultValue={product?.priceCurrency ?? 'RUB'}
               className="frame block w-full p-1"
             />

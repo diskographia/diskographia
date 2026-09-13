@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-// звёздочка держит ссылки объекта: наведение раскрывает список прямо в экране
+// звёздочка держит ссылки предмета: наведение раскрывает список прямо в экране
 export function LinksStar({ links }: { links: { label: string; url: string }[] }) {
   const [open, setOpen] = useState(false);
 
@@ -16,7 +16,12 @@ export function LinksStar({ links }: { links: { label: string; url: string }[] }
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
       onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
+      onBlur={(event) => {
+        // фокус ушёл внутрь списка, а не наружу: список нужен, чтобы дойти до ссылок с клавиатуры
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setOpen(false);
+        }
+      }}
     >
       <button
         type="button"
@@ -31,8 +36,8 @@ export function LinksStar({ links }: { links: { label: string; url: string }[] }
 
       {open ? (
         <ul className="links-drop">
-          {links.map((link) => (
-            <li key={link.url}>
+          {links.map((link, index) => (
+            <li key={`${index}-${link.url}`}>
               <a href={link.url} target="_blank" rel="noreferrer noopener" className="underline">
                 {link.label}
               </a>

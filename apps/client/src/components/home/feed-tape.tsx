@@ -1,25 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-import { previewUrl } from '@/api/client';
+import { previewUrl } from '@/api/urls';
 import type { EntityCard } from '@/api/types';
 import { StaticScreen } from '@/components/world/static-screen';
 import { routes } from '@/routes';
 
-// интервал не согласован
-const INTERVAL_MS = 5000;
+import { useCarousel } from './carousel';
 
 interface FeedTapeProps {
   items: EntityCard[];
   onShow?: (card: EntityCard) => void;
 }
 
-// лента главной: по одному объекту во весь экран, сама сменяется и листается стрелкой
+// лента главной: по одному предмету во весь экран, сама сменяется и листается стрелкой
 export function FeedTape({ items, onShow }: FeedTapeProps) {
-  const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const { index, next, hold } = useCarousel(items.length);
   const shown = items.length ? items[index % items.length]! : null;
 
   useEffect(() => {
@@ -28,38 +26,27 @@ export function FeedTape({ items, onShow }: FeedTapeProps) {
     }
   }, [shown, onShow]);
 
-  useEffect(() => {
-    if (items.length < 2 || paused) {
-      return;
-    }
-
-    const timer = setInterval(() => setIndex((value) => (value + 1) % items.length), INTERVAL_MS);
-
-    return () => clearInterval(timer);
-  }, [items.length, paused]);
-
-  if (items.length === 0) {
+  if (!shown) {
     return <StaticScreen>no_data</StaticScreen>;
   }
 
-  const card = shown!;
-  const preview = previewUrl(card.coverPath);
+  const preview = previewUrl(shown.coverPath);
 
   return (
-    <div className="tape" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <Link href={routes.entity(card.ownerHandle, card.slug)} className="tape-shot" title={`открыть: ${card.title}`}>
-        {preview ? <img src={preview} alt="" /> : <StaticScreen>no_signal</StaticScreen>}
+    <div className="tape" {...hold}>
+      <Link href={routes.entity(shown.ownerHandle, shown.slug)} className="tape-shot" title={`открыть: ${shown.title}`}>
+        {preview ? <img src={preview} alt={shown.title} /> : <StaticScreen>no_signal</StaticScreen>}
       </Link>
 
       <span className="tape-name">
-        {card.title}
-        {card.displayAuthor ? <span className="hint"> {card.displayAuthor.name}</span> : null}
+        {shown.title}
+        {shown.displayAuthor ? <span className="hint"> {shown.displayAuthor.name}</span> : null}
       </span>
 
       {items.length > 1 ? (
         <button
           type="button"
-          onClick={() => setIndex((value) => (value + 1) % items.length)}
+          onClick={next}
           className="tape-next"
           title={`следующее, всего ${items.length}`}
           aria-label="следующее"

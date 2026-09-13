@@ -1,6 +1,8 @@
 import sharp from 'sharp';
 
-const { data, info } = await sharp("D:/diskographia/сурсы/фон шума цельный.png").extract({ left: 1200, top: 600, width: 300, height: 300 }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+// зерно и плотность шума: node tools/measure/grain.mjs сурсы/фон-шума.png
+
+const { data, info } = await sharp(process.argv[2]).extract({ left: 1200, top: 600, width: 300, height: 300 }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 
 let dark = 0, light = 0, mid = 0;
 const lum = [];

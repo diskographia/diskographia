@@ -1,5 +1,7 @@
 import sharp from 'sharp';
 
+// безопасное поле экрана по красной заливке: node tools/measure/inner.mjs файл.png
+
 const file = process.argv[2];
 const { data, info } = await sharp(file).resize({ width: 400, fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 

@@ -12,26 +12,36 @@ export class AdminController {
 
   @Get('summary')
   summary(@CurrentIdentity() identity: Identity) {
-    return this.adminService.summary(identity.profileId);
+    this.adminService.assertPlatform(identity.isPlatform);
+
+    return this.adminService.summary();
   }
 
   @Get('objects')
   objects(@CurrentIdentity() identity: Identity, @Query('deleted') deleted?: string) {
-    return this.adminService.objects(identity.profileId, deleted === 'true');
+    this.adminService.assertPlatform(identity.isPlatform);
+
+    return this.adminService.objects(deleted === 'true');
   }
 
   @Post('objects/:id/hide')
   hide(@CurrentIdentity() identity: Identity, @Param('id') id: string) {
-    return this.adminService.hide(identity.profileId, id).then(() => ({ ok: true }));
+    this.adminService.assertPlatform(identity.isPlatform);
+
+    return this.adminService.hide(id).then(() => ({ ok: true }));
   }
 
   @Post('objects/:id/delete')
   remove(@CurrentIdentity() identity: Identity, @Param('id') id: string) {
-    return this.adminService.remove(identity.profileId, id).then(() => ({ ok: true }));
+    this.adminService.assertPlatform(identity.isPlatform);
+
+    return this.adminService.remove(id).then(() => ({ ok: true }));
   }
 
   @Post('objects/:id/restore')
   revive(@CurrentIdentity() identity: Identity, @Param('id') id: string) {
-    return this.adminService.revive(identity.profileId, id).then(() => ({ ok: true }));
+    this.adminService.assertPlatform(identity.isPlatform);
+
+    return this.adminService.revive(id).then(() => ({ ok: true }));
   }
 }

@@ -1,6 +1,8 @@
 import sharp from 'sharp';
 
-const file = "D:/diskographia/сурсы/рамка-модуль.png";
+// пробы прозрачности спрайта в точках: node tools/measure/probe.mjs сурсы/рамка-модуль.png
+
+const file = process.argv[2];
 const { data, info } = await sharp(file).resize({ width: 600, fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 const at = (px, py) => {
   const x = Math.round(px * info.width), y = Math.round(py * info.height);

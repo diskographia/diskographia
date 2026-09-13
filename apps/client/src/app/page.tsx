@@ -1,5 +1,5 @@
-import { apiGet, fileUrl } from '@/api/client';
-import { authHeaders, currentIdentity } from '@/api/session';
+import { apiGet } from '@/api/server';
+import { fileUrl } from '@/api/urls';
 import type { EntityPage, HomeFeed, MediaItem } from '@/api/types';
 import { currentViewer } from '@/api/viewer';
 import { GlobalEventScreen } from '@/components/home/global-event-screen';
@@ -10,10 +10,10 @@ import { Here } from '@/components/world/here';
 import { MANIFEST_SLUG, PLATFORM_HANDLE, SELECTION_SLUG, SHOWCASE_SLUG } from '@/platform';
 
 // три капсулы платформы нужны только учётке платформы и только для настройки главной
-async function readCapsules(headers: HeadersInit) {
+async function readCapsules() {
   const [selection, showcase, manifest] = await Promise.all(
     [SELECTION_SLUG, SHOWCASE_SLUG, MANIFEST_SLUG].map((slug) =>
-      apiGet<EntityPage>(`/profiles/${PLATFORM_HANDLE}/objects/${slug}`, { headers }).catch(() => null),
+      apiGet<EntityPage>(`/profiles/${PLATFORM_HANDLE}/objects/${slug}`).catch(() => null),
     ),
   );
 
@@ -21,18 +21,15 @@ async function readCapsules(headers: HeadersInit) {
 }
 
 export default async function HomePage() {
-  const headers = await authHeaders();
-  const [feed, identity, viewer] = await Promise.all([
-    apiGet<HomeFeed>('/feed/home', { headers }),
-    currentIdentity(),
-    currentViewer(),
+  const viewer = await currentViewer();
+  const [feed, capsules] = await Promise.all([
+    apiGet<HomeFeed>('/feed/home'),
+    viewer?.isAdmin ? readCapsules() : Promise.resolve(null),
   ]);
-
-  const capsules = viewer?.isAdmin ? await readCapsules(headers) : null;
 
   if (feed.mode === 'global' && feed.globalEvent) {
     const global = feed.globalEvent;
-    const media = await apiGet<MediaItem[]>(`/entities/${global.card.id}/media`, { headers }).catch(() => []);
+    const media = await apiGet<MediaItem[]>(`/entities/${global.card.id}/media`).catch(() => []);
 
     const tracks = media
       .filter((item) => item.media.kind === 'audio' && item.file)
@@ -54,7 +51,7 @@ export default async function HomePage() {
             preview={feed.preview ?? false}
             announcing={feed.phase === 'announce'}
             daysLeft={feed.daysLeft ?? 0}
-            authed={!!identity}
+            authed={!!viewer}
             manage={!!viewer?.isAdmin}
           />
         </HomeAdmin>

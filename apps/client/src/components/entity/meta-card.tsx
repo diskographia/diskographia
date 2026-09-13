@@ -1,6 +1,6 @@
 import type { EntityDetail } from '@/api/types';
 
-// произвольные поля объекта
+// произвольные поля предмета
 export function MetaCard({ fields }: { fields: EntityDetail['meta'] }) {
   if (fields.length === 0) {
     return null;
@@ -8,8 +8,8 @@ export function MetaCard({ fields }: { fields: EntityDetail['meta'] }) {
 
   return (
     <dl>
-      {fields.map((field) => (
-        <div key={`${field.label}:${field.value}`}>
+      {fields.map((field, index) => (
+        <div key={`${index}:${field.label}`}>
           <dt className="inline">{field.label}:</dt> <dd className="inline">{field.value}</dd>
         </div>
       ))}

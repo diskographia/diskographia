@@ -82,7 +82,7 @@ export class ProfilesService {
     return this.findByHandle(row.handle);
   }
 
-  // мягкое: профиль и учётка гаснут, объекты гаснут вместе с ними
+  // мягкое: профиль и учётка гаснут, предметы гаснут вместе с ними
   async closeAccount(profileId: string) {
     await this.db.transaction(async (tx) => {
       await tx.update(entities).set({ deletedAt: sql`now()` }).where(eq(entities.ownerId, profileId));

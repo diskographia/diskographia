@@ -1,18 +1,18 @@
-import { authHeaders } from '@/api/session';
+import { API_URL } from '@/api/urls';
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
-
-// токен в куке недоступен скриптам, поэтому браузер ходит через прослойку
+// в разработке caddy нет и браузер ходит в api через next: прослойка проносит куку туда и продлённую куку обратно.
+// в бою caddy отдаёт /api сразу серверу, и тот читает и ставит куку сам
 async function forward(request: Request, path: string[]): Promise<Response> {
-  const target = `${baseUrl}/${path.join('/')}${new URL(request.url).search}`;
+  const target = `${API_URL}/${path.join('/')}${new URL(request.url).search}`;
   const contentType = request.headers.get('content-type');
+  const cookie = request.headers.get('cookie');
   const hasBody = request.method !== 'GET' && request.method !== 'DELETE';
 
   try {
     const response = await fetch(target, {
       method: request.method,
       headers: {
-        ...(await authHeaders()),
+        ...(cookie ? { cookie } : {}),
         ...(contentType ? { 'content-type': contentType } : {}),
       },
       body: hasBody ? request.body : undefined,
@@ -20,10 +20,13 @@ async function forward(request: Request, path: string[]): Promise<Response> {
       cache: 'no-store',
     } as RequestInit & { duplex: 'half' });
 
-    return new Response(response.body, {
-      status: response.status,
-      headers: { 'content-type': response.headers.get('content-type') ?? 'application/json' },
-    });
+    const headers = new Headers({ 'content-type': response.headers.get('content-type') ?? 'application/json' });
+
+    for (const value of response.headers.getSetCookie()) {
+      headers.append('set-cookie', value);
+    }
+
+    return new Response(response.body, { status: response.status, headers });
   } catch {
     return Response.json({ message: 'сервер не отвечает' }, { status: 502 });
   }

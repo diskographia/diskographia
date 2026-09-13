@@ -3,51 +3,51 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
+import { failureText } from '@/api/failure';
+import { apiSend } from '@/api/server';
 import { SESSION_COOKIE } from '@/api/session';
+import { API_URL } from '@/api/urls';
 import { routes } from '@/routes';
-
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
 
 export interface AuthState {
   error: string | null;
 }
 
-async function keepToken(token: string): Promise<void> {
+async function keepToken(token: string, expiresAt: string): Promise<void> {
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60 * 24 * 7,
+    expires: new Date(expiresAt),
   });
 }
 
-async function failure(response: Response, fallback: string): Promise<string> {
-  const body = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
-  const message = Array.isArray(body?.message) ? body.message.join(', ') : body?.message;
-
-  return message ?? fallback;
-}
-
 export async function signIn(_state: AuthState, form: FormData): Promise<AuthState> {
-  const response = await fetch(`${baseUrl}/auth/sign-in`, {
+  const response = await fetch(`${API_URL}/auth/sign-in`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
     cache: 'no-store',
-  });
+  }).catch(() => null);
 
-  if (!response.ok) {
-    return { error: await failure(response, 'войти не удалось') };
+  if (!response) {
+    return { error: 'сервер не отвечает' };
   }
 
-  const { token } = (await response.json()) as { token: string };
+  if (!response.ok) {
+    return { error: await failureText(response) };
+  }
 
-  await keepToken(token);
+  const { token, expiresAt } = (await response.json()) as { token: string; expiresAt: string };
+
+  await keepToken(token, expiresAt);
   redirect(routes.home());
 }
 
+// сессия гасится на сервере, кука стирается: токен больше никуда не пустит
 export async function signOut(): Promise<void> {
+  await apiSend('/auth/sign-out', 'POST').catch(() => null);
   (await cookies()).delete(SESSION_COOKIE);
   redirect(routes.home());
 }
