@@ -366,6 +366,20 @@ export class EntitiesService {
   }
 
   // все свои, включая черновики, поэтому видимость идёт вместе с карточкой
+  async listPlaces(ownerId: string): Promise<{ cities: string[]; locations: string[] }> {
+    const rows = await this.db
+      .select({ city: entityEvents.city, location: entityEvents.location, at: entities.updatedAt })
+      .from(entityEvents)
+      .innerJoin(entities, eq(entities.id, entityEvents.entityId))
+      .where(and(eq(entities.ownerId, ownerId), isNull(entities.deletedAt)))
+      .orderBy(desc(entities.updatedAt))
+      .limit(200);
+
+    const unique = (values: (string | null)[]) => [...new Set(values.map((value) => value?.trim() ?? '').filter(Boolean))];
+
+    return { cities: unique(rows.map((row) => row.city)), locations: unique(rows.map((row) => row.location)) };
+  }
+
   async listOwned(ownerId: string) {
     const rows = await this.db
       .select()

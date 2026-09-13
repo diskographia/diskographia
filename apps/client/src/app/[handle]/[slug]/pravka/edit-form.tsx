@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { startTransition, useActionState, useEffect, useRef, useState } from 'react';
 
+import { ZONE } from '@/api/time';
 import type { ChildLink, EntityCard, EntityDetail, MediaItem, ScheduleEntry } from '@/api/types';
 import { ApplicationsManager } from '@/components/entity/applications-manager';
 import { ChildrenManager } from '@/components/entity/children-manager';
@@ -42,6 +43,7 @@ interface EditFormProps {
 }
 
 const AUTOSAVE_MS = 2500;
+const savedClock = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, hour: '2-digit', minute: '2-digit' });
 
 // что уже приложено: коротко, в углу экрана показа
 function mediaSummary(media: MediaItem[]): string {
@@ -180,7 +182,7 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
             <strong>{role ? role.label : entity.title}</strong>
 
             <div className="mt-1 flex flex-wrap items-center gap-1">
-              <button type="submit" disabled={pending} className="frame px-2 py-1">
+              <button type="submit" disabled={pending} title="ctrl+s" className="frame px-2 py-1">
                 {pending ? 'сохраняем' : 'сохранить'}
               </button>
               <Link href={viewPath} className="underline">
@@ -189,7 +191,7 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
             </div>
 
             {state.error ? <p className="mt-1">Ошибка: {state.error}</p> : null}
-            {state.savedAt && !dirty ? <p className="mt-1">Сохранено.</p> : null}
+            {state.savedAt && !dirty ? <p className="mt-1">Сохранено в {savedClock.format(new Date(state.savedAt))}.</p> : null}
             {dirty ? <p className="hint mt-1">Есть несохранённые правки.</p> : null}
             {entity.visibility === 'draft' ? <Hint>Черновик сохраняется автоматически.</Hint> : null}
           </div>

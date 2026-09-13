@@ -35,6 +35,13 @@ export class EntitiesController {
     return this.entitiesService.listOwned(identity.profileId);
   }
 
+  // города и адреса из своих ивентов: подсказки в форме, свежие первыми
+  @Get('mine/places')
+  @UseGuards(AuthGuard)
+  listPlaces(@CurrentIdentity() identity: Identity) {
+    return this.entitiesService.listPlaces(identity.profileId);
+  }
+
   @Get('deleted')
   @UseGuards(AuthGuard)
   listDeleted(@CurrentIdentity() identity: Identity) {
