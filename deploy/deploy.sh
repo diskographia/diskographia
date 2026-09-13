@@ -59,5 +59,5 @@ done
 
 echo "новая версия не отвечает"
 echo "логи: docker compose --env-file .env.production logs --tail 100 server client"
-echo "откат: ./deploy/deploy.sh sha-<прошлый коммит>"
+echo "откат: ./deploy/deploy.sh ${WAS:-sha-<прошлый коммит>}"
 exit 1
