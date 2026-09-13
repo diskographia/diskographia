@@ -24,8 +24,17 @@ SERVER_PORT="${SERVER_PORT:-4000}"
 
 WAS=$(docker compose --env-file .env.production images server --format '{{.Tag}}' 2>/dev/null | head -1 || true)
 
+# пакеты в ghcr закрытые: actions передаёт временный токен, руками нужен токен github с read:packages
+if [ -n "${GHCR_TOKEN:-}" ]; then
+  echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-github}" --password-stdin
+fi
+
 echo "== тянем образы $TAG =="
 docker compose --env-file .env.production pull
+
+if [ -n "${GHCR_TOKEN:-}" ]; then
+  docker logout ghcr.io >/dev/null
+fi
 
 echo "== копия базы и файлов перед миграциями =="
 ./deploy/backup.sh || echo "копия не снялась, продолжаем"
