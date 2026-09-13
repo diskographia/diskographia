@@ -1971,3 +1971,62 @@ textarea.frame:focus {
   display: block;
   max-width: none;
 }
+
+/* медиа предмета: плитки с превью, порядок тянется мышью */
+.media-board {
+  padding: 4px;
+}
+
+.media-board.dropping {
+  outline: 2px dashed var(--etch);
+  outline-offset: -2px;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.media-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  background: var(--muted);
+  cursor: grab;
+}
+
+.media-tile.dragging {
+  opacity: 0.5;
+}
+
+.media-tile.over {
+  outline: 2px solid var(--etch);
+}
+
+.media-shot {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #fff;
+}
+
+.media-shot > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.media-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--etch);
+  letter-spacing: 0.1em;
+}

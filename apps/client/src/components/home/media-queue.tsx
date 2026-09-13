@@ -17,18 +17,23 @@ const StreamFrame = dynamic(() => import('./stream-frame').then((module) => modu
 interface MediaQueueProps {
   media: MediaItem[];
   objects?: EntityCard[];
+  // обложка показывается карточкой в ленте, поэтому в очереди показа не крутится
+  skipCover?: boolean;
 }
 
 type Slide = { kind: 'stream' | 'video' | 'image'; item: MediaItem } | { kind: 'object'; card: EntityCard };
 
 // стрим стоит первым и сам не листается, второстепенная очередь из картинок и предметов крутится пока стрима нет
-export function MediaQueue({ media, objects = [] }: MediaQueueProps) {
+export function MediaQueue({ media, objects = [], skipCover = false }: MediaQueueProps) {
+  const cover = skipCover ? media.find((item) => item.media.kind === 'image' && item.file) : undefined;
   const primary: Slide[] = media
     .filter((item) => item.media.kind === 'embed' || (item.media.kind === 'video' && item.file))
     .map((item) => ({ kind: item.media.kind === 'embed' ? 'stream' : 'video', item }));
 
   const secondary: Slide[] = [
-    ...media.filter((item) => item.media.kind === 'image' && item.file).map((item): Slide => ({ kind: 'image', item })),
+    ...media
+      .filter((item) => item.media.kind === 'image' && item.file && item !== cover)
+      .map((item): Slide => ({ kind: 'image', item })),
     ...objects.map((card): Slide => ({ kind: 'object', card })),
   ];
 

@@ -60,7 +60,7 @@ export function GlobalEventScreen({
           {scene?.file ? (
             <SceneView src={fileUrl(scene.file.path) ?? ''} title={global.card.title} />
           ) : (
-            <MediaQueue media={media} objects={feed} />
+            <MediaQueue media={media} objects={feed} skipCover />
           )}
 
           {manage ? (
