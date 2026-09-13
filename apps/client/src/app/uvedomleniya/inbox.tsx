@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { request } from '@/api/browser';
+import { ZONE } from '@/api/time';
 import type { NotificationItem, NotificationKind } from '@/api/types';
 import { AsciiNote } from '@/components/world/ascii';
 import { routes } from '@/routes';
@@ -20,7 +21,7 @@ const WORDING: Record<NotificationKind, (payload: Record<string, unknown>) => st
   feedback_received: (p) => (p.entityTitle ? `Отклик на «${p.entityTitle}»` : 'Отклик вашему профилю'),
 };
 
-const stamp = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const stamp = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export function Inbox({ initial }: { initial: NotificationItem[] }) {
   const router = useRouter();

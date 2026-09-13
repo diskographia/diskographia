@@ -2,14 +2,16 @@
 
 import { useState } from 'react';
 
+import { ZONE } from '@/api/time';
 import type { ScheduleEntry } from '@/api/types';
 import { MarkdownView } from '@/components/entity/markdown-view';
 import { Modal } from '@/components/modal';
 
-const dayFormat = new Intl.DateTimeFormat('ru-RU', { day: '2-digit' });
-const monthFormat = new Intl.DateTimeFormat('ru-RU', { month: '2-digit' });
-const timeFormat = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
-const fullDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
+const dayFormat = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, day: '2-digit' });
+const monthFormat = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, month: '2-digit' });
+const timeFormat = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, hour: '2-digit', minute: '2-digit' });
+const fullDate = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, day: 'numeric', month: 'long' });
+const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
 
 const VISIBLE = 3;
 
@@ -25,7 +27,7 @@ function groupByDay(entries: ScheduleEntry[]): Day[] {
 
   for (const entry of entries) {
     const date = new Date(entry.startsAt);
-    const key = date.toDateString();
+    const key = dayKey.format(date);
     const day = days.get(key) ?? { key, date, entries: [] };
 
     day.entries.push(entry);

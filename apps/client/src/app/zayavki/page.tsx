@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { apiGet } from '@/api/server';
+import { ZONE } from '@/api/time';
 import type { MyApplication } from '@/api/types';
 import { requireService } from '@/api/viewer';
 import { ListScreen } from '@/components/layout/list-screen';
@@ -13,7 +14,7 @@ const STATUS: Record<MyApplication['status'], string> = {
   declined: 'отклонили',
 };
 
-const stamp = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const stamp = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, day: '2-digit', month: '2-digit', year: 'numeric' });
 
 export default async function ApplicationsPage() {
   const viewer = await requireService();

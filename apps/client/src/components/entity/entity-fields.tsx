@@ -1,5 +1,6 @@
 'use client';
 
+import { isoToParts } from '@/api/time';
 import type { EntityDetail, EntityKind } from '@/api/types';
 
 import { DisplayAuthorInput } from './display-author-input';
@@ -15,15 +16,19 @@ interface EntityFieldsProps {
 
 const VISIBILITY = Object.entries(VISIBILITY_LABEL).map(([value, label]) => ({ value, label }));
 
-// datetime-local работает в местном времени, поэтому сдвигаем на смещение пояса
-function forInput(value: string | null | undefined): string {
-  if (!value) {
-    return '';
-  }
+// дата и время лежат двумя полями: время можно не указывать, тогда считается полночь и не показывается
+function DateTimeInput({ name, label, value }: { name: string; label: string; value: string | null | undefined }) {
+  const initial = isoToParts(value);
 
-  const moment = new Date(value);
-
-  return new Date(moment.getTime() - moment.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  return (
+    <label className="mt-2 block">
+      {label}
+      <span className="flex flex-wrap gap-1">
+        <input type="date" name={`${name}Date`} defaultValue={initial.date} className="frame block flex-1 p-1" />
+        <input type="time" name={`${name}Time`} defaultValue={initial.time} className="frame block p-1" />
+      </span>
+    </label>
+  );
 }
 
 // паспорт предмета: то, без чего он не существует
@@ -63,33 +68,9 @@ export function DetailFields({ kind, entity, platform = false }: EntityFieldsPro
       {kind === 'event' ? (
         <fieldset className="frame mt-2 p-2">
           <legend>ивент</legend>
-          <label className="block">
-            начало, пусто значит сейчас
-            <input
-              type="datetime-local"
-              name="startsAt"
-              defaultValue={forInput(entity?.event?.startsAt)}
-              className="frame block w-full p-1"
-            />
-          </label>
-          <label className="mt-2 block">
-            конец, не обязательно
-            <input
-              type="datetime-local"
-              name="endsAt"
-              defaultValue={forInput(entity?.event?.endsAt)}
-              className="frame block w-full p-1"
-            />
-          </label>
-          <label className="mt-2 block">
-            время анонса, не позже начала
-            <input
-              type="datetime-local"
-              name="announceAt"
-              defaultValue={forInput(entity?.event?.announceAt)}
-              className="frame block w-full p-1"
-            />
-          </label>
+          <DateTimeInput name="starts" label="начало: пусто значит сейчас, время можно не указывать" value={entity?.event?.startsAt} />
+          <DateTimeInput name="ends" label="конец, не обязательно" value={entity?.event?.endsAt} />
+          <DateTimeInput name="announce" label="анонс с этого момента, не позже начала" value={entity?.event?.announceAt} />
           <label className="mt-2 block">
             текст анонса, показывается до начала
             <textarea

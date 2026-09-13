@@ -1,16 +1,9 @@
+import { zonedToIso } from '@/api/time';
 import type { EntityKind } from '@/api/types';
 
-// datetime-local отдаёт местное время без пояса, пустое поле значит «нет даты»
-function isoOrNull(value: FormDataEntryValue | null): string | null {
-  const text = String(value ?? '').trim();
-
-  if (!text) {
-    return null;
-  }
-
-  const moment = new Date(text);
-
-  return Number.isNaN(moment.getTime()) ? null : moment.toISOString();
+// дата и время из двух полей формы, пустая дата значит «нет даты»
+function isoOrNull(form: FormData, name: string): string | null {
+  return zonedToIso(String(form.get(`${name}Date`) ?? ''), String(form.get(`${name}Time`) ?? ''));
 }
 
 // ссылка без схемы дописывается до https, сервер принимает только http и https
@@ -52,18 +45,18 @@ export function entityPayload(form: FormData, kind: EntityKind): Record<string, 
   if (kind === 'event') {
     // пустое начало значит сейчас, остальные даты не обязательны
     payload.event = {
-      startsAt: isoOrNull(form.get('startsAt')) ?? new Date().toISOString(),
-      endsAt: isoOrNull(form.get('endsAt')),
-      announceAt: isoOrNull(form.get('announceAt')),
+      startsAt: isoOrNull(form, 'starts') ?? new Date().toISOString(),
+      endsAt: isoOrNull(form, 'ends'),
+      announceAt: isoOrNull(form, 'announce'),
       announceMd: String(form.get('announceMd') ?? ''),
       location: String(form.get('location') ?? '').trim() || null,
       city: String(form.get('city') ?? '').trim() || null,
       latitude: numberOrNull(form.get('latitude')),
       longitude: numberOrNull(form.get('longitude')),
       isGlobal: form.get('isGlobal') === 'on',
-      lingerDays: Number(form.get('lingerDays') ?? 0),
+      lingerDays: Number(form.get('lingerDays') || 0),
       applicationsOpen: form.get('applicationsOpen') === 'on',
-      applicationTtlDays: Number(form.get('applicationTtlDays') ?? 30),
+      applicationTtlDays: Number(form.get('applicationTtlDays') || 30),
     };
   }
 

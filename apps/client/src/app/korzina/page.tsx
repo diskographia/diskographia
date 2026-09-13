@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 
 import { apiGet } from '@/api/server';
+import { ZONE } from '@/api/time';
 import type { DeletedEntity } from '@/api/types';
 import { requireService } from '@/api/viewer';
 import { kindLabel } from '@/components/entity/labels';
@@ -8,7 +9,7 @@ import { ListScreen } from '@/components/layout/list-screen';
 
 import { RestoreButton } from './restore-button';
 
-const stamp = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const stamp = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 export default async function TrashPage() {
   const viewer = await requireService();

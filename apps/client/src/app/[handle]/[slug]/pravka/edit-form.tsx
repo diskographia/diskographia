@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState, useRef } from 'react';
+import { startTransition, useActionState, useRef } from 'react';
 
 import type { ChildLink, EntityCard, EntityDetail, MediaItem, ScheduleEntry } from '@/api/types';
 import { ApplicationsManager } from '@/components/entity/applications-manager';
@@ -51,7 +51,16 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
   const global = !!entity.event?.isGlobal;
 
   return (
-    <form ref={form} action={action} onKeyDown={keepEnter} className="contents">
+    <form
+      ref={form}
+      onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        startTransition(() => action(data));
+      }}
+      onKeyDown={keepEnter}
+      className="contents"
+    >
       <Here place="правка" inside={entity.title} />
       <LeaveGuard ask={dirty} onSave={() => form.current?.requestSubmit()} />
 
@@ -64,6 +73,8 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
         caps={{ feed: 'правка', head: 'предмет', meta: 'действия' }}
         feed={
           <div className="form-column">
+            {state.error ? <p className="frame p-2">Не сохранилось: {state.error}</p> : null}
+
             <section className="form-section">
               <h2>паспорт</h2>
               <IdentityFields kind={entity.kind} entity={entity} />

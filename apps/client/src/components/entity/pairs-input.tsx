@@ -46,6 +46,15 @@ export function PairsInput({
   const update = (key: string, part: Partial<Pair>) =>
     setRows((list) => list.map((row) => (row.key === key ? { ...row, ...part } : row)));
 
+  // адрес без схемы дописывается до https при уходе из поля
+  const settle = (key: string, value: string) => {
+    const text = value.trim();
+
+    if (secondType === 'url' && text && !/^[a-z][a-z0-9+.-]*:/i.test(text)) {
+      update(key, { second: `https://${text}` });
+    }
+  };
+
   const filled = rows
     .filter((row) => row.first.trim() && row.second.trim())
     .map((row) => ({ [firstKey]: row.first.trim(), [secondKey]: row.second.trim() }));
@@ -66,9 +75,10 @@ export function PairsInput({
           />
           <input
             value={row.second}
-            type={secondType}
+            type="text"
             inputMode={secondType === 'url' ? 'url' : undefined}
             onChange={(event) => update(row.key, { second: event.target.value })}
+            onBlur={(event) => settle(row.key, event.target.value)}
             placeholder={secondPlaceholder}
             aria-label={secondPlaceholder}
             className="frame min-w-0 flex-[3_1_14em] p-1"
