@@ -17,6 +17,11 @@ set +a
 UPLOADS="${UPLOADS_HOST_DIR:-./uploads}"
 mkdir -p "$UPLOADS"
 
+# пакеты в ghcr закрытые: нужен токен github с read:packages в GHCR_USER и GHCR_TOKEN
+if [ -n "${GHCR_TOKEN:-}" ]; then
+  echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-github}" --password-stdin
+fi
+
 docker compose --env-file .env.production pull
 docker compose --env-file .env.production up -d postgres
 docker compose --env-file .env.production run --rm server pnpm db:migrate

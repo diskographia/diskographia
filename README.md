@@ -92,7 +92,7 @@ pnpm --filter @diskographia/client dev            # порт 3000
 - работа идёт в отдельных ветках, вливается через pull request
 - на каждый pull request GitHub Actions гоняет типы, линтер, обе сборки, миграции на чистой базе и разбор `docker-compose.yml`
 - на `main` он же собирает боевые образы и кладёт их в `ghcr.io/diskographia/diskographia-server` и `diskographia-client` с тегами `latest` и `sha-<коммит>`. Адреса клиента вшиваются в образ при сборке: их боевые значения задаются переменными репозитория (settings, variables, `NEXT_PUBLIC_*`), без них берутся значения из `.env.production.example`
-- **пуш ничего не выкатывает.** Боевой сайт меняется только руками, командой по ssh: сервер тянет готовый образ
+- **влитое в `main` выкатывается само**: после сборки образов GitHub Actions заходит на сервер по ssh и запускает `deploy/deploy.sh` с тегом этого коммита. Поэтому в `main` попадает только то, что готово стоять на боевом
 
 ## Как это стоит на сервере
 
@@ -104,87 +104,103 @@ pnpm --filter @diskographia/client dev            # порт 3000
 
 В докере крутятся только клиент, сервер и postgres, наружу они не смотрят вообще: порты слушаются на `127.0.0.1`. Домены, сертификаты и раздачу файлов держит caddy на самой машине.
 
-Репозитория на сервере нет и ничего там не собирается: образы приходят готовыми из `ghcr.io`. На сервере лежит только папка стенда, `/srv/diskographia`: `docker-compose.yml`, `.env.production`, `deploy/` со скриптами, рядом `uploads` и `backups`.
+Репозитория на сервере нет и ничего там не собирается: образы приходят готовыми из `ghcr.io`. На сервере лежит только папка стенда у своего пользователя, `/home/diskographia/diskographia`: `docker-compose.yml`, `.env.production`, `deploy/` со скриптами и `backups`; загруженные файлы отдельно в `/srv/diskographia/uploads`.
 
 База живёт в томе докера `postgres`, загруженные файлы обычной папкой на диске, чтобы caddy отдавал их напрямую, минуя докер и node. И то и другое переживает пересборку.
 
 Файлы стоят на отдельном имени: так загруженный кем-то файл не окажется на одном имени с сайтом. Раскладка на диске от даты и хеша: `2026/09/ab/<sha256>.jpg`, превью рядом в `derivatives`. Одинаковые файлы дедуплицируются по хешу: путь уже лежащего файла берётся из базы, вторая копия не пишется. Тип файла определяется по содержимому, а не по заголовку запроса.
 
+### Домены
+
+Главное имя `disk64.zip`. `www.disk64.zip` и `diskographia.zip` перекидывают на него постоянным редиректом, файлы живут на `files.disk64.zip`. Все три имени указывают на один сервер.
+
 ### Сервер с нуля
 
-Ubuntu 24.04, пользователь с sudo, caddy уже стоит на машине.
+Ubuntu 24.04, caddy уже стоит на машине, докер тоже. Под стенд заводится свой пользователь без sudo, но в группе `docker`: от него ходит выкатка из GitHub Actions, и в его папке лежит стенд. Делается один раз человеком с sudo:
 
 ```bash
-# докер
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER && newgrp docker
+sudo useradd --system -m -d /home/diskographia -s /bin/bash -G docker diskographia
+sudo install -d -m 700 -o diskographia -g diskographia /home/diskographia/.ssh
+sudo install -d -m 750 -o diskographia -g diskographia /home/diskographia/diskographia
 
-# папка стенда и папка под загруженные файлы, её будет отдавать caddy
+# папка под загруженные файлы, её будет отдавать caddy
 sudo mkdir -p /srv/diskographia/uploads
-sudo chown -R "$USER" /srv/diskographia
+
+# ключ, которым GitHub Actions заходит на сервер: закрытая часть уходит в секрет репозитория
+sudo -u diskographia ssh-keygen -t ed25519 -N "" -C github-actions -f /home/diskographia/.ssh/deploy_ed25519
+sudo sh -c 'cat /home/diskographia/.ssh/deploy_ed25519.pub >> /home/diskographia/.ssh/authorized_keys'
+sudo chown diskographia:diskographia /home/diskographia/.ssh/authorized_keys && sudo chmod 600 /home/diskographia/.ssh/authorized_keys
 ```
 
-С рабочей машины в папку стенда копируются три вещи из репозитория, они меняются редко:
-
-```bash
-scp -r docker-compose.yml .env.production.example deploy пользователь@адрес:/srv/diskographia/
-ssh пользователь@адрес 'cd /srv/diskographia && chmod +x deploy/*.sh && cp -n .env.production.example .env.production'
-```
-
-Если репозиторий на GitHub закрытый, пакеты в `ghcr.io` тоже закрытые, и докеру на сервере нужен вход: токен GitHub с правом `read:packages`, один раз `docker login ghcr.io -u <логин>` и токен вместо пароля. У открытого репозитория пакеты тянутся без входа.
+Папка стенда `/home/diskographia/diskographia`: имя папки задаёт имя проекта compose и тома базы (`diskographia_postgres`), переименовывать нельзя. В неё кладутся `docker-compose.yml`, `deploy/` и `.env.production` по образцу `.env.production.example`; дальше compose и скрипты обновляет сама выкатка.
 
 В `.env.production` заполнить:
 
 - `POSTGRES_PASSWORD` и тот же пароль внутри `DATABASE_URL`
 - `JWT_SECRET`, получить: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`
-- `PLATFORM_EMAIL` и `PLATFORM_PASSWORD`, это учётка платформы
-- домены в `CLIENT_ORIGINS`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_UPLOADS_URL`
+- `PLATFORM_EMAIL` и `PLATFORM_PASSWORD`, это учётка платформы, пароль не короче десяти знаков
 - `UPLOADS_HOST_DIR`, папку из шага выше
-- `SERVER_PORT` и `CLIENT_PORT`, если 4000 и 3000 на машине заняты
+- `SERVER_PORT` и `CLIENT_PORT`, те же порты, что в блоке caddy; на текущем сервере 4500 и 3500
 - `IMAGE_TAG` обычно `latest`, скрипт выкатки меняет его сам
 
-Домены: основной и отдельный для файлов, оба A-записью на адрес сервера.
+Первый запуск от пользователя стенда:
 
 ```bash
-./deploy/first-run.sh
+sudo -iu diskographia
+cd ~/diskographia && chmod +x deploy/*.sh && ./deploy/first-run.sh
 ```
 
 Скрипт стянет образы, поднимет базу, прогонит миграции и заведёт учётку платформы. После этого в базе только она и три пустых контейнера: подборка, витрина, манифест. Всё остальное заводится руками через интерфейс.
 
-### Переезд с сервера, где стенд уже стоит из репозитория
+Пакеты в `ghcr.io` закрытые. Выкатка из Actions входит в реестр временным токеном прогона и выходит после `pull`, на сервере ничего не остаётся. Для выкатки руками нужен токен GitHub с правом `read:packages`: `GHCR_USER=<логин> GHCR_TOKEN=<токен> ./deploy/deploy.sh`, либо один раз `docker login ghcr.io` от пользователя стенда.
 
-Данные трогать не нужно: база в томе докера, файлы в `UPLOADS_HOST_DIR`. Единственная ловушка: имя тома складывается из имени папки, в которой лежит `docker-compose.yml` (`diskographia_postgres`). Поэтому новые `docker-compose.yml` и `deploy/` кладутся в ту же папку, где стенд стоит сейчас, поверх старых, `.env.production` остаётся, в него дописывается `IMAGE_PREFIX` и `IMAGE_TAG` из образца. Дальше обычная выкатка: `./deploy/deploy.sh`. Клон репозитория после этого можно удалить, оставив в папке только `docker-compose.yml`, `.env.production`, `deploy/`, `uploads` и `backups`, но саму папку не переименовывать. Если очень хочется переехать в `/srv/diskographia`, сначала `docker compose down`, потом в новой папке `COMPOSE_PROJECT_NAME=<имя старой папки>` в `.env.production`, тогда том найдётся.
+### Что лежит на GitHub
+
+Переменные репозитория (Settings, Secrets and variables, Actions, Variables), они вшиваются в образ клиента при сборке и должны совпадать с `.env.production`:
+
+```
+NEXT_PUBLIC_API_URL                https://disk64.zip/api
+NEXT_PUBLIC_UPLOADS_URL            https://files.disk64.zip
+NEXT_PUBLIC_PLATFORM_HANDLE        discography
+NEXT_PUBLIC_HOME_SELECTION_SLUG    home-selection
+NEXT_PUBLIC_HOME_SHOWCASE_SLUG     home-showcase
+NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG manifest
+NEXT_PUBLIC_DEMO_MODE              true
+```
+
+Секреты репозитория для выкатки по ssh: `DISKOGRAPHIA_HOST` (адрес сервера), `DISKOGRAPHIA_PORT` (порт ssh), `DISKOGRAPHIA_USER` (`diskographia`), `DISKOGRAPHIA_SSH_PRIVATE_KEY` (содержимое `deploy_ed25519` целиком). Паролей, почты и `JWT_SECRET` на GitHub нет и быть не должно: они живут только в `.env.production` на сервере.
 
 ### Caddy
 
-Образец лежит в `deploy/Caddyfile`: `/api/*` уходит на сервер, всё остальное на клиент, отдельное имя раздаёт папку с файлами со своими заголовками безопасности. Домены и путь к папке в нём надо поменять на свои.
+На сервере один общий `/etc/caddy/Caddyfile` хоста, в нём наши блоки лежат рядом с чужими сайтами, а порт 443 держит не caddy, а прокси хоста, который пропускает трафик к caddy по имени сайта. Поэтому правятся только наши блоки, глобальные настройки и чужие блоки не трогаются. Образец наших блоков в `deploy/Caddyfile`: `/api/*` уходит на сервер, всё остальное на клиент, `www` и старый домен перекидывают на главный, отдельное имя раздаёт папку с файлами со своими заголовками безопасности.
 
 ```bash
-sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
-sudo caddy validate --config /etc/caddy/Caddyfile
+sudo cp -p /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak-$(date +%F)
+sudoedit /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 sudo systemctl reload caddy
 ```
 
-Сертификаты caddy выпускает и продлевает сам. Если они приходят снаружи или выпускаются через dns-испытание, в блок домена добавляется свой `tls`, остальная часть конфига не меняется.
+Сертификаты caddy выпускает и продлевает сам, новое имя получает сертификат за секунды после reload.
 
 Файлы в папку пишет контейнер сервера от рута, права выходят `644` на файлы и `755` на папки, поэтому caddy читает их без дополнительной настройки. Всё, кроме картинок и медиа, caddy отдаёт как скачивание: чужой html или svg в браузере не откроется.
 
-Правки в `Caddyfile` нужны только когда меняются домены или порты. Обычная выкатка кода caddy не трогает.
+Правки в `Caddyfile` нужны только когда меняются домены или порты. Выкатка кода caddy не трогает.
 
 ### Обычная выкатка
 
-Сначала коммит попадает в `main` и GitHub Actions докладывает, что образы собраны (вкладка Actions, задача «образы в ghcr.io»). Потом:
+Коммит попадает в `main`, GitHub Actions собирает образы, кладёт их в `ghcr.io`, копирует на сервер `docker-compose.yml` и `deploy/` и запускает там `./deploy/deploy.sh sha-<коммит>` от пользователя стенда. Руками ничего делать не нужно, ход виден во вкладке Actions, задача «выкатка на сервер».
+
+Что происходит на сервере по шагам: тянутся образы, снимается копия базы и файлов, прогоняются миграции, контейнеры переключаются, скрипт ждёт ответа `/api/health` по локальному порту. Пока тянутся образы, работает старая версия. Простой равен перезапуску контейнеров, это секунды. Если новая версия не ответила за полторы минуты, скрипт печатает команды логов и отката, а старые образы подчищает сам.
+
+Та же выкатка руками, когда нужно (пакеты закрытые, поэтому с токеном `read:packages`, см. выше):
 
 ```bash
-ssh пользователь@адрес
-cd /srv/diskographia
-./deploy/deploy.sh                    # свежий latest
-./deploy/deploy.sh sha-<коммит>       # ровно этот коммит
+ssh -p <порт> diskographia@<адрес>
+cd ~/diskographia
+GHCR_USER=<логин> GHCR_TOKEN=<токен> ./deploy/deploy.sh                # свежий latest
+GHCR_USER=<логин> GHCR_TOKEN=<токен> ./deploy/deploy.sh sha-<коммит>   # ровно этот коммит
 ```
-
-Что происходит по шагам: тянутся образы, снимается копия базы и файлов, прогоняются миграции, контейнеры переключаются, скрипт ждёт ответа `/api/health` по локальному порту. Пока тянутся образы, работает старая версия. Простой равен перезапуску контейнеров, это секунды. Если новая версия не ответила за полторы минуты, скрипт печатает команды логов и отката, а старые образы подчищает сам.
-
-Если поменялись сами `docker-compose.yml` или скрипты в `deploy/`, их нужно скопировать на сервер заново той же командой `scp`, что при первой установке.
 
 ### Откат
 
@@ -192,7 +208,7 @@ cd /srv/diskographia
 ./deploy/deploy.sh sha-<прошлый коммит>
 ```
 
-Тег пишется в `IMAGE_TAG` в `.env.production`, следующая выкатка без аргумента вернёт `latest`. В теге полный хеш коммита, `sha-` и сорок знаков: список собранных тегов виден на GitHub в разделе Packages, хеш нужного коммита даёт `git rev-parse <коммит>`.
+Тег пишется в `IMAGE_TAG` в `.env.production`, следующая выкатка вернёт `latest`. В теге полный хеш коммита, `sha-` и сорок знаков: список собранных тегов виден на GitHub в разделе Packages, хеш нужного коммита даёт `git rev-parse <коммит>`. Следующий коммит в `main` выкатится поверх отката сам, так что откат это передышка, а не состояние.
 
 Миграции идут только вперёд, откат кода схему не возвращает. Поэтому опасны только те, что удаляют или переименовывают. Правило: сначала добавили колонку и выкатили код, который умеет и по-старому и по-новому, и только следующей выкаткой убрали старую. Тогда откат кода всегда безопасен.
 
@@ -235,13 +251,13 @@ sudo caddy validate --config /etc/caddy/Caddyfile
 
 ```bash
 crontab -e
-0 4 * * * cd /srv/diskographia && ./deploy/backup.sh >> backups/cron.log 2>&1
+0 4 * * * cd /home/diskographia/diskographia && ./deploy/backup.sh >> backups/cron.log 2>&1
 ```
 
 Копии лежат на том же диске, что и сайт, поэтому раз в неделю их стоит забирать к себе:
 
 ```bash
-rsync -avz пользователь@адрес:/srv/diskographia/backups/ ./копии/
+rsync -avz -e 'ssh -p <порт>' diskographia@<адрес>:diskographia/backups/ ./копии/
 ```
 
 ### Возврат из копии
