@@ -64,17 +64,16 @@ export function DetailFields({ kind, entity, platform = false }: EntityFieldsPro
         <fieldset className="frame mt-2 p-2">
           <legend>ивент</legend>
           <label className="block">
-            начало
+            начало, пусто значит сейчас
             <input
               type="datetime-local"
               name="startsAt"
               defaultValue={forInput(entity?.event?.startsAt)}
-              required
               className="frame block w-full p-1"
             />
           </label>
           <label className="mt-2 block">
-            конец
+            конец, не обязательно
             <input
               type="datetime-local"
               name="endsAt"
