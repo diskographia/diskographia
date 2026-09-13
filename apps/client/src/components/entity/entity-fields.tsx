@@ -6,6 +6,7 @@ import type { EntityDetail, EntityKind } from '@/api/types';
 import { DisplayAuthorInput } from './display-author-input';
 import { KIND_LABEL, VISIBILITY_LABEL } from './labels';
 import { PairsInput } from './pairs-input';
+import { PlaceFields } from './place-fields';
 import { TagsInput } from './tags-input';
 import { PriceInput } from './price-input';
 
@@ -40,7 +41,13 @@ export function IdentityFields({ kind, entity }: { kind: EntityKind; entity?: En
 
       <label className="block">
         название
-        <input name="title" defaultValue={entity?.title ?? ''} required className="frame block w-full p-1" />
+        <input
+          name="title"
+          defaultValue={entity?.title ?? ''}
+          required
+          autoFocus={!entity}
+          className="frame block w-full p-1"
+        />
       </label>
 
       <label className="mt-2 block">
@@ -79,14 +86,7 @@ export function DetailFields({ kind, entity, platform = false }: EntityFieldsPro
               className="frame block w-full p-1"
             />
           </label>
-          <label className="mt-2 block">
-            адрес
-            <input name="location" defaultValue={entity?.event?.location ?? ''} className="frame block w-full p-1" />
-          </label>
-          <label className="mt-2 block">
-            город
-            <input name="city" defaultValue={entity?.event?.city ?? ''} className="frame block w-full p-1" />
-          </label>
+          <PlaceFields location={entity?.event?.location ?? ''} city={entity?.event?.city ?? ''} />
           <div className="mt-2 flex flex-wrap gap-1">
             <label className="min-w-40 flex-1">
               широта, можно пусто

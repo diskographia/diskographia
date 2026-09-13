@@ -10,6 +10,7 @@ import { fileUrl, previewUrl } from '@/api/urls';
 import type { Abilities, EntityCard, EntityPage } from '@/api/types';
 import { DEMO_MODE, canBrowse, currentViewer } from '@/api/viewer';
 import { AuthorLine } from '@/components/entity/author-line';
+import { CopyLink } from '@/components/entity/copy-link';
 import { BoundMedia } from '@/components/entity/bound-media';
 import { EntityGrid, type GridItem } from '@/components/entity/entity-grid';
 import { ExpandableText } from '@/components/entity/expandable-text';
@@ -182,6 +183,11 @@ export default async function EntityDetailPage({ params, searchParams }: PagePro
               <div>
                 <strong>{entity.title}</strong>
                 <AuthorLine ownerHandle={nickname} displayAuthor={entity.displayAuthor} linked={browse} />
+                {abilities?.edit ? (
+                  <p className="mt-1">
+                    <CopyLink path={routes.entity(nickname, slug)} />
+                  </p>
+                ) : null}
 
                 {entity.event ? (
                   <HeadlineValue>{formatEventPeriod(entity.event.startsAt, entity.event.endsAt)}</HeadlineValue>
