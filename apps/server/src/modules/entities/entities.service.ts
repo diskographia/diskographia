@@ -30,6 +30,7 @@ import {
   entityCollaborators,
   entityTags,
   profiles,
+  rolePermissions,
   roles,
   tags,
 } from '../../database/schema/index.js';
@@ -270,9 +271,20 @@ export class EntitiesService {
         and(
           eq(entityChildren.parentId, parentId),
           eq(entityChildren.status, 'approved'),
-          // чужой черновик не виден даже владельцу контейнера, свой виден только себе
+          // чужой черновик не виден даже владельцу контейнера: только его владельцу и соавторам с правом правки,
+          // то же правило, что при открытии предмета напрямую
           viewerId
-            ? or(inArray(entities.visibility, ['public', 'unlisted']), eq(entities.ownerId, viewerId))
+            ? or(
+                inArray(entities.visibility, ['public', 'unlisted']),
+                eq(entities.ownerId, viewerId),
+                sql`exists (
+                  select 1 from ${entityCollaborators}
+                  join ${rolePermissions} on ${rolePermissions.roleId} = ${entityCollaborators.roleId}
+                  where ${entityCollaborators.entityId} = ${entities.id}
+                    and ${entityCollaborators.profileId} = ${viewerId}
+                    and ${rolePermissions.permission} = 'edit'
+                )`,
+              )
             : inArray(entities.visibility, ['public', 'unlisted']),
         ),
       )
