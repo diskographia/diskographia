@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { startTransition, useActionState, useRef, useState } from 'react';
+import { startTransition, useActionState, useEffect, useRef, useState } from 'react';
 
 import type { ChildLink, EntityCard, EntityDetail, MediaItem, ScheduleEntry } from '@/api/types';
 import { ApplicationsManager } from '@/components/entity/applications-manager';
@@ -41,6 +41,8 @@ interface EditFormProps {
   schedule: ScheduleEntry[];
 }
 
+const AUTOSAVE_MS = 2500;
+
 // все поля живут в большом левом экране одной колонкой, маленькие экраны держат кнопки и подсказки
 export function EditForm({ entity, handle, cover, media, nested, owned, canPin, owner, platform, schedule }: EditFormProps) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveEntity, { error: null, savedAt: null });
@@ -51,6 +53,38 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
   const container = entity.kind === 'event' || entity.kind === 'capsule';
   const role = platformRole(handle, entity.slug);
   const global = !!entity.event?.isGlobal;
+
+  // черновик сохраняется сам через пару секунд после правки, пока в форме стоит «черновик».
+  // публичный и прочие видимости сохраняются только кнопкой, чтобы ничего не уехало наружу само
+  useEffect(() => {
+    const node = form.current;
+
+    if (!node || entity.visibility !== 'draft') {
+      return;
+    }
+
+    let timer = 0;
+
+    const onInput = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const data = new FormData(node);
+
+        if (data.get('visibility') !== 'draft' || checkForm(data, entity.kind, 'update').length > 0) {
+          return;
+        }
+
+        startTransition(() => action(data));
+      }, AUTOSAVE_MS);
+    };
+
+    node.addEventListener('input', onInput);
+
+    return () => {
+      window.clearTimeout(timer);
+      node.removeEventListener('input', onInput);
+    };
+  }, [entity.visibility, entity.kind, action]);
 
   return (
     <form
@@ -140,6 +174,7 @@ export function EditForm({ entity, handle, cover, media, nested, owned, canPin, 
             {state.error ? <p className="mt-1">Ошибка: {state.error}</p> : null}
             {state.savedAt && !dirty ? <p className="mt-1">Сохранено.</p> : null}
             {dirty ? <p className="hint mt-1">Есть несохранённые правки.</p> : null}
+            {entity.visibility === 'draft' ? <Hint>Черновик сохраняется сам, пока остаётся черновиком.</Hint> : null}
           </div>
         }
         meta={

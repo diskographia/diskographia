@@ -6,6 +6,7 @@ import type { EntityDetail, EntityKind } from '@/api/types';
 import { DisplayAuthorInput } from './display-author-input';
 import { KIND_LABEL, VISIBILITY_LABEL } from './labels';
 import { PairsInput } from './pairs-input';
+import { TagsInput } from './tags-input';
 import { PriceInput } from './price-input';
 
 interface EntityFieldsProps {
@@ -53,10 +54,7 @@ export function IdentityFields({ kind, entity }: { kind: EntityKind; entity?: En
         </select>
       </label>
 
-      <label className="mt-2 block">
-        теги через запятую
-        <input name="tags" defaultValue={entity?.tags.join(', ') ?? ''} className="frame block w-full p-1" />
-      </label>
+      <TagsInput initial={entity?.tags.join(', ') ?? ''} />
     </>
   );
 }

@@ -12,6 +12,12 @@ const dayTime = new Intl.DateTimeFormat('ru-RU', {
 const time = new Intl.DateTimeFormat('ru-RU', { timeZone: ZONE, hour: '2-digit', minute: '2-digit' });
 const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
 
+const clock = new Intl.DateTimeFormat('en-GB', { timeZone: ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+
+function endOfDay(moment: Date): boolean {
+  return clock.format(moment) === '23:59';
+}
+
 // дата без времени показывается одной датой
 function stamp(iso: string): string {
   return hasTime(iso) ? dayTime.format(new Date(iso)) : day.format(new Date(iso));
@@ -27,7 +33,7 @@ export function formatEventPeriod(startsAt: string, endsAt: string | null): stri
   const sameDay = dayKey.format(start) === dayKey.format(end);
 
   if (sameDay) {
-    return hasTime(endsAt) ? `${stamp(startsAt)} - ${time.format(end)}` : stamp(startsAt);
+    return hasTime(endsAt) && !endOfDay(end) ? `${stamp(startsAt)} - ${time.format(end)}` : stamp(startsAt);
   }
 
   return `${stamp(startsAt)} - ${stamp(endsAt)}`;

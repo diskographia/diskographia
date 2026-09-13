@@ -1,14 +1,18 @@
 'use client';
 
-import { startTransition, useActionState, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { startTransition, useActionState, useEffect, useRef, useState } from 'react';
 
+import { uploadFile } from '@/api/browser';
 import type { EntityKind } from '@/api/types';
 import { DetailFields, IdentityFields } from '@/components/entity/entity-fields';
 import { checkForm, focusIssue, type FormIssue } from '@/components/entity/form-check';
 import { keepEnter } from '@/components/entity/keep-enter';
 import { MarkdownEditor } from '@/components/entity/markdown-editor';
+import { PendingFiles } from '@/components/media/pending-files';
 import { ModuleLayout } from '@/components/layout/module-layout';
 import { Hint } from '@/components/ui/hint';
+import { routes } from '@/routes';
 import { AsciiNote } from '@/components/world/ascii';
 import { LeaveGuard } from '@/components/world/leave-guard';
 import { useDirty } from '@/components/world/use-dirty';
@@ -30,6 +34,34 @@ export function CreateForm({ platform }: { platform: boolean }) {
   const form = useRef<HTMLFormElement>(null);
   const { dirty } = useDirty(form, null);
   const [issues, setIssues] = useState<FormIssue[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const router = useRouter();
+  const finished = useRef(false);
+
+  // предмет создан: файлы уходят по одному, потом правка. сбойный файл не останавливает переход
+  useEffect(() => {
+    const created = state.created;
+
+    if (!created || finished.current) {
+      return;
+    }
+
+    finished.current = true;
+
+    const run = async () => {
+      for (const [index, file] of files.entries()) {
+        setUploading(`${index + 1} из ${files.length}: ${file.name}`);
+        await uploadFile(`/entities/${created.id}/media`, file, () => undefined).done;
+      }
+
+      router.push(routes.entityEdit(created.handle, created.slug));
+    };
+
+    void run();
+  }, [state.created, files, router]);
+
+  const busy = pending || !!state.created;
 
   return (
     <form
@@ -51,7 +83,7 @@ export function CreateForm({ platform }: { platform: boolean }) {
       onKeyDown={keepEnter}
       className="contents"
     >
-      <LeaveGuard ask={dirty && !pending} onSave={() => form.current?.requestSubmit()} />
+      <LeaveGuard ask={dirty && !busy} onSave={() => form.current?.requestSubmit()} />
       <input type="hidden" name="kind" value={kind} />
 
       <ModuleLayout
@@ -103,6 +135,11 @@ export function CreateForm({ platform }: { platform: boolean }) {
               <h2>свойства</h2>
               <DetailFields kind={kind} platform={platform} />
             </section>
+
+            <section className="form-section">
+              <h2>файлы</h2>
+              <PendingFiles files={files} onChange={setFiles} />
+            </section>
           </div>
         }
         media={
@@ -115,14 +152,16 @@ export function CreateForm({ platform }: { platform: boolean }) {
             <strong>создание</strong>
             <p>Сначала будет виден только вам.</p>
 
-            <button type="submit" disabled={pending} className="frame mt-1 px-2 py-1">
-              {pending ? 'создаём' : 'создать'}
+            <button type="submit" disabled={busy} className="frame mt-1 px-2 py-1">
+              {uploading ? 'грузим файлы' : pending ? 'создаём' : 'создать'}
             </button>
+
+            {uploading ? <p className="hint mt-1">Файл {uploading}</p> : null}
 
             {state.error ? <p className="mt-1">Ошибка: {state.error}</p> : null}
           </div>
         }
-        meta={<Hint>Файлы, вложенное и расписание добавляются сразу после создания, в правке.</Hint>}
+        meta={<Hint>Вложенное и расписание добавляются сразу после создания, в правке. Файлы можно приложить уже здесь.</Hint>}
         text={
           <div>
             <p>Предмет появится среди ваших с видимостью «черновик».</p>
