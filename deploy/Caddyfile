@@ -1,8 +1,9 @@
-# caddy стоит на самой машине, а не в контейнере, и держит сертификаты сам
-# файл кладётся в /etc/caddy/Caddyfile, проверка: caddy validate --config /etc/caddy/Caddyfile
-# перечитать без простоя: sudo systemctl reload caddy
+# caddy стоит на самой машине, а не в контейнере, и держит сертификаты сам.
+# на сервере это часть общего /etc/caddy/Caddyfile хоста: здесь только наши блоки, править их через sudoedit,
+# проверка: caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile, применить: sudo systemctl reload caddy.
+# порты 3500 и 4500 это CLIENT_PORT и SERVER_PORT из .env.production
 
-diskographia.ru, www.diskographia.ru {
+https://disk64.zip {
 	encode zstd gzip
 
 	# файл до двухсот мегабайт, тот же предел стоит на сервере в UPLOAD_MAX_BYTES
@@ -18,20 +19,25 @@ diskographia.ru, www.diskographia.ru {
 		-Server
 	}
 
-	# api уходит сразу серверу: кука с токеном читается им самим, next в этой цепочке не нужен
+	# api уходит сразу серверу: кука с токеном читается им самим
 	handle /api/* {
-		reverse_proxy 127.0.0.1:4000 {
+		reverse_proxy 127.0.0.1:4500 {
 			flush_interval -1
 		}
 	}
 
 	handle {
-		reverse_proxy 127.0.0.1:3000
+		reverse_proxy 127.0.0.1:3500
 	}
 }
 
+# главное имя одно: disk64.zip, старое и www на него перекидывают
+https://www.disk64.zip, https://diskographia.zip {
+	redir https://disk64.zip{uri} permanent
+}
+
 # пользовательские файлы живут на отдельном имени, чтобы чужой скрипт не оказался на нашем
-files.diskographia.ru {
+files.disk64.zip {
 	root * /srv/diskographia/uploads
 	file_server
 
@@ -43,7 +49,7 @@ files.diskographia.ru {
 		-Server
 	}
 
-	# всё, кроме картинок и медиа, скачивается, а не показывается: то же правило, что в uploads.static.ts
+	# всё, кроме картинок и медиа, скачивается, а не показывается: то же правило, что на сервере
 	@download {
 		not path *.jpg *.jpeg *.png *.webp *.avif *.gif *.mp3 *.flac *.wav *.ogg *.mp4 *.webm *.mov
 	}

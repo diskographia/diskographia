@@ -136,13 +136,49 @@ jobs:
           cache-from: type=gha,scope=client
           cache-to: type=gha,mode=max,scope=client
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://diskographia.ru/api' }}
-            NEXT_PUBLIC_UPLOADS_URL=${{ vars.NEXT_PUBLIC_UPLOADS_URL || 'https://files.diskographia.ru' }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://disk64.zip/api' }}
+            NEXT_PUBLIC_UPLOADS_URL=${{ vars.NEXT_PUBLIC_UPLOADS_URL || 'https://files.disk64.zip' }}
             NEXT_PUBLIC_PLATFORM_HANDLE=${{ vars.NEXT_PUBLIC_PLATFORM_HANDLE || 'discography' }}
             NEXT_PUBLIC_HOME_SELECTION_SLUG=${{ vars.NEXT_PUBLIC_HOME_SELECTION_SLUG || 'home-selection' }}
             NEXT_PUBLIC_HOME_SHOWCASE_SLUG=${{ vars.NEXT_PUBLIC_HOME_SHOWCASE_SLUG || 'home-showcase' }}
             NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG=${{ vars.NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG || 'manifest' }}
             NEXT_PUBLIC_DEMO_MODE=${{ vars.NEXT_PUBLIC_DEMO_MODE || 'true' }}
+
+  # выкатка: на сервер уезжают compose и скрипты, дальше deploy.sh тянет образы этого коммита, гонит миграции и перезапускает.
+  # ходит по ssh от отдельного пользователя стенда, ключ и адрес лежат в секретах репозитория
+  deploy:
+    name: выкатка на сервер
+    needs: [images]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: compose и скрипты на сервер
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.DISKOGRAPHIA_HOST }}
+          port: ${{ secrets.DISKOGRAPHIA_PORT }}
+          username: ${{ secrets.DISKOGRAPHIA_USER }}
+          key: ${{ secrets.DISKOGRAPHIA_SSH_PRIVATE_KEY }}
+          source: docker-compose.yml,deploy/deploy.sh,deploy/backup.sh,deploy/restore.sh,deploy/first-run.sh,deploy/Caddyfile
+          target: diskographia
+
+      - name: deploy.sh
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DISKOGRAPHIA_HOST }}
+          port: ${{ secrets.DISKOGRAPHIA_PORT }}
+          username: ${{ secrets.DISKOGRAPHIA_USER }}
+          key: ${{ secrets.DISKOGRAPHIA_SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/diskographia
+            chmod +x deploy/*.sh
+            ./deploy/deploy.sh sha-${{ github.sha }}
 
   stand:
     name: разбор стенда
