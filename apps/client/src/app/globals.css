@@ -910,15 +910,24 @@ textarea.frame:focus {
   aspect-ratio: 1;
   margin: -75% 0 0 -75%;
   z-index: 6;
-  cursor: grab;
-  touch-action: none;
+  pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
   will-change: transform;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
 }
 
-.disc.held {
+/* область захвата: круг по самому диску, спрайт вокруг него прозрачный и с тенью */
+.disc-grip {
+  position: absolute;
+  inset: 13%;
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.disc.held .disc-grip {
   cursor: grabbing;
 }
 

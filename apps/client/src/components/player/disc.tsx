@@ -48,6 +48,8 @@ export function Disc({ playing, idle, onPress }: DiscProps) {
       }}
     >
       <img src="/decor/disc.webp" alt="" draggable={false} className={`disc-face${playing ? ' spinning' : ''}`} />
+      {/* хватается только сам диск: тень и поля спрайта нажатия не ловят, кнопки под ними доступны */}
+      <span className="disc-grip" />
     </div>
   );
 }
