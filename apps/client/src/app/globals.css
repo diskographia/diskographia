@@ -51,7 +51,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--etch);
   outline-offset: 1px;
 }
 
@@ -1937,4 +1937,37 @@ textarea.frame:focus {
   top: 6px;
   height: 340px;
   transform: rotate(90deg);
+}
+
+/* плитка тега в поле: подпись и крестик, в тон нажатых клавиш платы */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 0 6px;
+  background: var(--on);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+}
+
+.tag-chip > button {
+  border: 0;
+  background: none;
+  padding: 0 4px;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* список файлов до создания предмета: обычный блок, а не растянутый на экран показа */
+.drop-list {
+  height: auto;
+  display: block;
+  padding: 4px;
+}
+
+.drop-list .drop-note {
+  position: static;
+  display: block;
+  max-width: none;
 }

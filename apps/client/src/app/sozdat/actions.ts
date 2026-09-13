@@ -11,6 +11,7 @@ import { routes } from '@/routes';
 
 export interface CreateState {
   error: string | null;
+  created?: { id: string; handle: string; slug: string };
 }
 
 export async function createEntity(_state: CreateState, form: FormData): Promise<CreateState> {
@@ -27,8 +28,8 @@ export async function createEntity(_state: CreateState, form: FormData): Promise
     return { error: await failureText(response) };
   }
 
-  const created = (await response.json()) as { slug: string };
+  const created = (await response.json()) as { id: string; slug: string };
 
-  // сразу в правку: там прикрепляется медиа
-  redirect(routes.entityEdit(identity.handle, created.slug));
+  // дальше клиент: догружает собранные файлы и сам уходит в правку
+  return { error: null, created: { id: created.id, handle: identity.handle, slug: created.slug } };
 }

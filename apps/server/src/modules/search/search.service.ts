@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, like, sql, type SQL } from 'drizzle-orm';
 
 import { readEnv } from '../../config/env.js';
 import { DATABASE, type Database } from '../../database/database.module.js';
 import { entities, entityTags, profiles, tags } from '../../database/schema/index.js';
 import { EntityCardsService } from '../entities/entity-cards.service.js';
-import type { EntityKind } from '@diskographia/shared';
+import { normalizeTag, type EntityKind } from '@diskographia/shared';
 
 export type SearchSort = 'relevance' | 'fresh' | 'feedback';
 
@@ -103,16 +103,23 @@ export class SearchService {
       .offset((page - 1) * perPage);
   }
 
-  // фасеты для боковых фильтров: сколько предметов по каждому тегу нашлось
-  async tagFacets(limit = readEnv().SEARCH_TAG_FACETS) {
+  // фасеты для боковых фильтров и подсказок: сколько публичных предметов по каждому тегу.
+  // с началом слова подсказка идёт по всем тегам, включая те, что пока только в черновиках
+  async tagFacets(prefix = '', limit = readEnv().SEARCH_TAG_FACETS) {
+    const start = normalizeTag(prefix);
+
     return this.db
-      .select({ name: tags.name, total: sql<number>`count(*)::int` })
-      .from(entityTags)
-      .innerJoin(tags, eq(tags.id, entityTags.tagId))
-      .innerJoin(entities, eq(entities.id, entityTags.entityId))
-      .where(and(eq(entities.visibility, 'public'), isNull(entities.deletedAt)))
+      .select({ name: tags.name, total: sql<number>`count(${entities.id})::int` })
+      .from(tags)
+      .leftJoin(entityTags, eq(entityTags.tagId, tags.id))
+      .leftJoin(
+        entities,
+        and(eq(entities.id, entityTags.entityId), eq(entities.visibility, 'public'), isNull(entities.deletedAt)),
+      )
+      .where(start ? like(tags.name, `${start.replace(/[%_\\]/g, '\\$&')}%`) : sql`true`)
       .groupBy(tags.name)
-      .orderBy(sql`count(*) desc`)
+      .having(start ? sql`true` : sql`count(${entities.id}) > 0`)
+      .orderBy(sql`count(${entities.id}) desc`, asc(tags.name))
       .limit(limit);
   }
 }

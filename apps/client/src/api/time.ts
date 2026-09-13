@@ -64,6 +64,11 @@ export function isoToParts(iso: string | null | undefined): { date: string; time
   return { date: `${w.year}-${two(w.month!)}-${two(w.day!)}`, time: midnight ? '' : `${two(w.hour!)}:${two(w.minute!)}` };
 }
 
+// дата момента в поясе платформы, как в поле формы
+export function zonedDate(iso: string): string {
+  return isoToParts(iso).date;
+}
+
 export function hasTime(iso: string): boolean {
   const w = wall(new Date(iso));
 

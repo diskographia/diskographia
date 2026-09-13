@@ -13,6 +13,10 @@ const listOfStrings = z
   .default([])
   .transform((value) => (Array.isArray(value) ? value : value.split(',')).map((item) => item.trim()).filter(Boolean));
 
+const tagQuerySchema = z.object({
+  q: z.string().max(48).default(''),
+});
+
 const searchQuerySchema = z.object({
   q: z.string().max(200).default(''),
   kind: listOfStrings.pipe(z.array(z.enum(ENTITY_KINDS))),
@@ -43,8 +47,9 @@ export class SearchController {
     return this.searchService.profiles(query.q, query.page, query.perPage);
   }
 
+  // без q самые ходовые теги, с q подсказка по началу слова для поля тегов
   @Get('tags')
-  tagFacets() {
-    return this.searchService.tagFacets();
+  tagFacets(@Query(new ZodValidationPipe(tagQuerySchema)) query: z.infer<typeof tagQuerySchema>) {
+    return this.searchService.tagFacets(query.q);
   }
 }

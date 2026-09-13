@@ -1,4 +1,4 @@
-import { zonedToIso } from '@/api/time';
+import { zonedDate, zonedToIso } from '@/api/time';
 import type { EntityKind } from '@/api/types';
 
 // дата и время из двух полей формы, пустая дата значит «нет даты»
@@ -43,10 +43,15 @@ export function entityPayload(form: FormData, kind: EntityKind): Record<string, 
   };
 
   if (kind === 'event') {
-    // пустое начало значит сейчас, остальные даты не обязательны
+    // пустое начало значит сейчас. пустая дата конца берёт дату начала, конец без времени это 23:59 того дня
+    const startsAt = isoOrNull(form, 'starts') ?? new Date().toISOString();
+    const startsDate = String(form.get('startsDate') ?? '').trim() || zonedDate(startsAt);
+    const endsDate = String(form.get('endsDate') ?? '').trim() || startsDate;
+    const endsTime = String(form.get('endsTime') ?? '').trim() || (endsDate === startsDate ? '23:59' : '');
+
     payload.event = {
-      startsAt: isoOrNull(form, 'starts') ?? new Date().toISOString(),
-      endsAt: isoOrNull(form, 'ends'),
+      startsAt,
+      endsAt: zonedToIso(endsDate, endsTime),
       announceAt: isoOrNull(form, 'announce'),
       announceMd: String(form.get('announceMd') ?? ''),
       location: String(form.get('location') ?? '').trim() || null,
