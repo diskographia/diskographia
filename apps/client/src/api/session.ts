@@ -1,27 +1,36 @@
+import { cache } from 'react';
+
+import { SESSION_COOKIE, type Identity } from '@diskographia/shared';
 import { cookies } from 'next/headers';
 
-import { apiGet } from './client';
+import { API_URL } from './urls';
 
-export const SESSION_COOKIE = 'diskographia_session';
+export { SESSION_COOKIE };
+export type { Identity };
 
-export interface Identity {
-  profileId: string;
-  handle: string;
-}
-
-export async function readToken(): Promise<string | null> {
+export const readToken = cache(async (): Promise<string | null> => {
   return (await cookies()).get(SESSION_COOKIE)?.value ?? null;
-}
+});
 
-export async function currentIdentity(): Promise<Identity | null> {
+// одна проверка токена на запрос: раскладка, полоса и страница читают одно и то же
+export const currentIdentity = cache(async (): Promise<Identity | null> => {
   const token = await readToken();
 
   if (!token) {
     return null;
   }
 
-  return apiGet<Identity>('/auth/me', { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
-}
+  const response = await fetch(`${API_URL}/auth/me`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  }).catch(() => null);
+
+  if (!response?.ok) {
+    return null;
+  }
+
+  return response.json() as Promise<Identity>;
+});
 
 export async function authHeaders(): Promise<Record<string, string>> {
   const token = await readToken();

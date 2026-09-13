@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# первый запуск на чистом сервере
+# первый запуск на чистом сервере: в папке стенда лежат docker-compose.yml, .env.production и deploy/
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -17,7 +17,7 @@ set +a
 UPLOADS="${UPLOADS_HOST_DIR:-./uploads}"
 mkdir -p "$UPLOADS"
 
-docker compose --env-file .env.production build
+docker compose --env-file .env.production pull
 docker compose --env-file .env.production up -d postgres
 docker compose --env-file .env.production run --rm server pnpm db:migrate
 docker compose --env-file .env.production run --rm server pnpm seed:admin

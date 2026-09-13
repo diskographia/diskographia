@@ -1,5 +1,7 @@
 import sharp from 'sharp';
 
+// срез яркости по средней строке спрайта: node tools/measure/profile.mjs файл.png [ширина]
+
 const file = process.argv[2];
 const width = Number(process.argv[3] ?? 600);
 

@@ -2,14 +2,11 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundEx
 import type { ScheduleEntryInput } from '@diskographia/shared';
 import { and, asc, eq, isNull, lte, or, sql, gte } from 'drizzle-orm';
 
-import { readEnv } from '../../config/env.js';
 import { DATABASE, type Database } from '../../database/database.module.js';
 import { entities, entityEvents, eventSchedule, profiles } from '../../database/schema/index.js';
 
 @Injectable()
 export class GlobalEventService {
-  private readonly env = readEnv();
-
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   // окно жизни экрана: с анонса и до конца плюс дни после. платформе показываем и не начавшийся
@@ -24,7 +21,7 @@ export class GlobalEventService {
           eq(entityEvents.isGlobal, true),
           eq(entities.visibility, 'public'),
           isNull(entities.deletedAt),
-          sql`lower(${profiles.handle}) = lower(${this.env.PLATFORM_HANDLE})`,
+          eq(profiles.isPlatform, true),
           or(
             isNull(entityEvents.endsAt),
             gte(sql`${entityEvents.endsAt} + make_interval(days => ${entityEvents.lingerDays})`, sql`now()`),
@@ -46,12 +43,12 @@ export class GlobalEventService {
     }
 
     const [owner] = await this.db
-      .select({ handle: profiles.handle })
+      .select({ isPlatform: profiles.isPlatform })
       .from(profiles)
       .where(eq(profiles.id, profileId))
       .limit(1);
 
-    return owner?.handle.toLowerCase() === this.env.PLATFORM_HANDLE.toLowerCase();
+    return owner?.isPlatform ?? false;
   }
 
   async schedule(eventId: string) {
@@ -80,8 +77,6 @@ export class GlobalEventService {
     await this.requireOrganizer(entry.eventId, actorId);
     await this.db.delete(eventSchedule).where(eq(eventSchedule.id, entryId));
   }
-
-
 
   private async requireOrganizer(eventId: string, actorId: string) {
     const [event] = await this.db

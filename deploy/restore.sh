@@ -19,8 +19,14 @@ read -r -p "это сотрёт текущую базу. напишите да, 
 
 docker compose --env-file .env.production stop server client
 
+# база пересоздаётся пустой: дамп ложится в чистую схему, а не поверх старой
+docker compose --env-file .env.production exec -T postgres \
+  psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 \
+  -c "DROP DATABASE IF EXISTS \"$POSTGRES_DB\" WITH (FORCE);" \
+  -c "CREATE DATABASE \"$POSTGRES_DB\" OWNER \"$POSTGRES_USER\";"
+
 gunzip -c "$DUMP" | docker compose --env-file .env.production exec -T postgres \
-  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 --quiet
 
 if [ -n "$FILES" ]; then
   rm -rf "${UPLOADS:?}"/*

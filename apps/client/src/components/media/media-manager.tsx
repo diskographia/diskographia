@@ -1,14 +1,17 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
-import { fileUrl } from '@/api/client';
-import { failureText } from '@/api/failure';
-import type { MediaItem } from '@/api/types';
+import { request } from '@/api/browser';
+import { previewUrl } from '@/api/urls';
+import type { MediaItem, MediaKind } from '@/api/types';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Modal } from '@/components/modal';
 
-const KIND: Record<string, string> = {
+import { progressLabel, useUploadQueue } from './upload-queue';
+
+const KIND: Record<MediaKind, string> = {
   image: 'картинка',
   audio: 'звук',
   video: 'видео',
@@ -18,20 +21,20 @@ const KIND: Record<string, string> = {
 };
 
 // две очереди правого экрана: сверху трансляции и видео, под ними фото
-const QUEUES: { title: string; note: string; kinds: string[] }[] = [
+const QUEUES: { title: string; note: string; kinds: MediaKind[] }[] = [
   {
     title: 'первая очередь: трансляции и видео',
-    note: 'показывается вместо всего остального и сама не листается',
+    note: 'Показывается вместо всего остального и сама не листается.',
     kinds: ['embed', 'video'],
   },
   {
     title: 'вторая очередь: фото',
-    note: 'крутится по кругу вместе с вложенными объектами, пока первой очереди нет',
+    note: 'Крутится по кругу вместе с вложенными предметами, пока первой очереди нет. Первое фото это обложка.',
     kinds: ['image'],
   },
   {
     title: 'вне очереди',
-    note: 'звук уходит в плеер, сцена и файлы открываются отдельно',
+    note: 'Звук уходит в плеер, сцена и файлы открываются с полки материалов.',
     kinds: ['audio', 'model', 'file'],
   },
 ];
@@ -42,58 +45,26 @@ interface MediaManagerProps {
   label?: string;
 }
 
-interface Progress {
-  done: number;
-  total: number;
-  current: string;
-}
-
 export function MediaManager({ entityId, media, label }: MediaManagerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [progress, setProgress] = useState<Progress | null>(null);
   const [stream, setStream] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const refresh = useCallback(() => router.refresh(), [router]);
+  const queue = useUploadQueue(entityId, refresh);
 
   async function send(path: string, method: string, body?: unknown): Promise<boolean> {
     setError(null);
 
-    const response = await fetch(path, {
-      method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    const answer = await request(path, method, body);
 
-    if (!response.ok) {
-      setError(await failureText(response));
+    if (!answer.ok) {
+      setError(answer.error);
       return false;
     }
 
     router.refresh();
     return true;
-  }
-
-  // файлы уходят по одному, чтобы сбойный не ронял остальные
-  async function upload(files: FileList): Promise<void> {
-    setError(null);
-
-    for (let index = 0; index < files.length; index += 1) {
-      const file = files[index]!;
-      setProgress({ done: index, total: files.length, current: file.name });
-
-      const body = new FormData();
-      body.append('file', file);
-
-      const response = await fetch(`/api/entities/${entityId}/media`, { method: 'POST', body });
-
-      if (!response.ok) {
-        setError(`${file.name}: ${await failureText(response)}`);
-        break;
-      }
-    }
-
-    setProgress(null);
-    router.refresh();
   }
 
   async function addStream(): Promise<void> {
@@ -103,25 +74,46 @@ export function MediaManager({ entityId, media, label }: MediaManagerProps) {
       return;
     }
 
-    if (await send(`/api/entities/${entityId}/media/embed`, 'POST', { url })) {
+    if (await send(`/entities/${entityId}/media/embed`, 'POST', { url })) {
       setStream('');
     }
   }
 
-  // порядок задаётся списком целиком: сервер принимает только полную перестановку
+  // порядок задаётся списком целиком: сервер принимает только полную перестановку.
+  // стрелки двигают в пределах своей очереди, чтобы шаг всегда был виден
   async function move(mediaId: string, step: number): Promise<void> {
     const ids = media.map((item) => item.media.id);
     const from = ids.indexOf(mediaId);
-    const to = from + step;
+    const kinds = QUEUES.find((group) => group.kinds.includes(media[from]!.media.kind))?.kinds ?? [];
+    const fellow = media.map((item, index) => ({ item, index })).filter(({ item }) => kinds.includes(item.media.kind));
+    const place = fellow.findIndex(({ index }) => index === from);
+    const neighbour = fellow[place + step];
 
-    if (from < 0 || to < 0 || to >= ids.length) {
+    if (from < 0 || !neighbour) {
       return;
     }
 
-    ids.splice(to, 0, ids.splice(from, 1)[0]!);
+    [ids[from], ids[neighbour.index]] = [ids[neighbour.index]!, ids[from]!];
 
-    await send(`/api/entities/${entityId}/media/order`, 'PATCH', { ids });
+    await send(`/entities/${entityId}/media/order`, 'PATCH', { ids });
   }
+
+  // обложка это первая картинка по порядку
+  async function makeCover(mediaId: string): Promise<void> {
+    const ids = media.map((item) => item.media.id).filter((id) => id !== mediaId);
+
+    await send(`/entities/${entityId}/media/order`, 'PATCH', { ids: [mediaId, ...ids] });
+  }
+
+  async function rename(item: MediaItem, title: string): Promise<void> {
+    if ((item.media.title ?? '') === title.trim()) {
+      return;
+    }
+
+    await send(`/media/${item.media.id}`, 'PATCH', { title });
+  }
+
+  const firstImage = media.find((item) => item.media.kind === 'image')?.media.id ?? null;
 
   return (
     <>
@@ -129,23 +121,26 @@ export function MediaManager({ entityId, media, label }: MediaManagerProps) {
         {label ?? 'медиа'} ({media.length})
       </button>
 
-      <Modal title="медиа и очереди объекта" open={open} onClose={() => setOpen(false)}>
-        <input
-          type="file"
-          multiple
-          accept="image/*,audio/*,video/*,.glb,.gltf,.zip,.pdf"
-          onChange={(event) => {
-            if (event.target.files?.length) {
-              void upload(event.target.files);
-            }
-          }}
-        />
+      <Modal title="медиа и очереди предмета" open={open} onClose={() => setOpen(false)}>
+        <label className="block">
+          загрузить файлы
+          <input
+            type="file"
+            multiple
+            className="block"
+            onChange={(event) => {
+              void queue.upload(event.target.files);
+              event.target.value = '';
+            }}
+          />
+        </label>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
             value={stream}
             onChange={(event) => setStream(event.target.value)}
             placeholder="ссылка на трансляцию: youtube или twitch"
+            aria-label="ссылка на трансляцию"
             className="frame flex-1 p-1"
           />
           <button type="button" onClick={() => void addStream()} className="frame px-2 py-1">
@@ -153,49 +148,56 @@ export function MediaManager({ entityId, media, label }: MediaManagerProps) {
           </button>
         </div>
 
-        {progress ? (
+        {queue.progress ? (
           <p className="mt-1">
-            загружается {progress.done + 1} из {progress.total}: {progress.current}
+            Загружается {progressLabel(queue.progress)}{' '}
+            <button type="button" onClick={queue.cancel} className="frame px-1">
+              отменить
+            </button>
           </p>
         ) : null}
 
-        {error ? <p className="mt-1">ошибка: {error}</p> : null}
+        {queue.error ? <p className="mt-1">Ошибка: {queue.error}</p> : null}
+        {error ? <p className="mt-1">Ошибка: {error}</p> : null}
 
-        {QUEUES.map((queue) => {
-          const rows = media.filter((item) => queue.kinds.includes(item.media.kind));
+        {QUEUES.map((group) => {
+          const rows = media.filter((item) => group.kinds.includes(item.media.kind));
 
           return (
-            <section key={queue.title} className="mt-3">
-              <strong>{queue.title}</strong>
-              <p className="hint">{queue.note}</p>
+            <section key={group.title} className="mt-3">
+              <strong>{group.title}</strong>
+              <p className="hint">{group.note}</p>
 
-              {rows.length === 0 ? <p className="mt-1">пусто</p> : null}
+              {rows.length === 0 ? <p className="mt-1">Пусто.</p> : null}
 
               <ul className="mt-1">
-                {rows.map((item) => (
-                  <li key={item.media.id} className="frame mb-2 flex items-center gap-2 p-2">
+                {rows.map((item, place) => (
+                  <li key={item.media.id} className="frame mb-2 flex flex-wrap items-center gap-2 p-2">
                     {item.file && item.media.kind === 'image' ? (
-                      <img src={fileUrl(item.file.path) ?? ''} alt="" className="h-16 w-16 object-cover" />
+                      <img src={previewUrl(item.file.path) ?? ''} alt="" loading="lazy" className="h-16 w-16 object-cover" />
                     ) : (
                       <span className="placeholder inline-block h-16 w-16" />
                     )}
 
-                    <span className="flex-1">
+                    <span className="min-w-40 flex-1">
                       <input
                         defaultValue={item.media.title ?? ''}
-                        onBlur={(event) => void send(`/api/media/${item.media.id}`, 'PATCH', { title: event.target.value })}
+                        onBlur={(event) => void rename(item, event.target.value)}
                         placeholder="название"
+                        aria-label="название"
                         className="frame block w-full p-1"
                       />
                       <span className="hint">
-                        {KIND[item.media.kind] ?? item.media.kind}
+                        {KIND[item.media.kind]}
                         {item.file ? `, ${Math.round(item.file.sizeBytes / 1024)} КБ` : ''}
                         {item.media.embedUrl ? `, ${item.media.embedUrl}` : ''}
+                        {item.media.id === firstImage ? ', обложка' : ''}
                       </span>
                     </span>
 
                     <button
                       type="button"
+                      disabled={place === 0}
                       onClick={() => void move(item.media.id, -1)}
                       title="выше в очереди"
                       aria-label="выше в очереди"
@@ -205,6 +207,7 @@ export function MediaManager({ entityId, media, label }: MediaManagerProps) {
                     </button>
                     <button
                       type="button"
+                      disabled={place === rows.length - 1}
                       onClick={() => void move(item.media.id, 1)}
                       title="ниже в очереди"
                       aria-label="ниже в очереди"
@@ -212,13 +215,26 @@ export function MediaManager({ entityId, media, label }: MediaManagerProps) {
                     >
                       &#8595;
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void send(`/api/media/${item.media.id}`, 'DELETE')}
-                      className="frame px-2"
-                    >
-                      убрать
-                    </button>
+
+                    {item.media.kind === 'image' && item.media.id !== firstImage ? (
+                      <button type="button" onClick={() => void makeCover(item.media.id)} className="frame px-2">
+                        сделать обложкой
+                      </button>
+                    ) : null}
+
+                    <ConfirmButton
+                      label="убрать"
+                      title="убрать медиа"
+                      question={
+                        <p>
+                          «{item.media.title || KIND[item.media.kind]}» отвяжется от предмета. Файл на диске останется, но
+                          прикрепить его заново придётся загрузкой.
+                        </p>
+                      }
+                      onConfirm={async () => {
+                        await send(`/media/${item.media.id}`, 'DELETE');
+                      }}
+                    />
                   </li>
                 ))}
               </ul>
@@ -226,7 +242,7 @@ export function MediaManager({ entityId, media, label }: MediaManagerProps) {
           );
         })}
 
-        <p className="hint mt-3">вложенные объекты во вторую очередь попадают сами, их порядок задаётся в «содержимом»</p>
+        <p className="hint mt-3">Вложенные предметы во вторую очередь попадают сами, их порядок задаётся в «что внутри».</p>
       </Modal>
     </>
   );

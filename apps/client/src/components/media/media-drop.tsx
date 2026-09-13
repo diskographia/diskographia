@@ -1,9 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 
-import { failureText } from '@/api/failure';
+import { progressLabel, useUploadQueue } from './upload-queue';
 
 interface MediaDropProps {
   entityId: string;
@@ -14,47 +14,32 @@ interface MediaDropProps {
 export function MediaDrop({ entityId, children }: MediaDropProps) {
   const router = useRouter();
   const picker = useRef<HTMLInputElement>(null);
+  const depth = useRef(0);
   const [over, setOver] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function upload(files: FileList | null): Promise<void> {
-    if (!files || files.length === 0) {
-      return;
-    }
-
-    setError(null);
-
-    for (let index = 0; index < files.length; index += 1) {
-      const file = files[index]!;
-      setBusy(`${index + 1} из ${files.length}: ${file.name}`);
-
-      const body = new FormData();
-      body.append('file', file);
-
-      const response = await fetch(`/api/entities/${entityId}/media`, { method: 'POST', body });
-
-      if (!response.ok) {
-        setError(`${file.name}: ${await failureText(response)}`);
-        break;
-      }
-    }
-
-    setBusy(null);
-    router.refresh();
-  }
+  const refresh = useCallback(() => router.refresh(), [router]);
+  const { upload, cancel, progress, error } = useUploadQueue(entityId, refresh);
 
   return (
     <div
       className="drop"
       data-over={over ? '' : undefined}
-      onDragOver={(event) => {
+      onDragEnter={(event) => {
         event.preventDefault();
+        depth.current += 1;
         setOver(true);
       }}
-      onDragLeave={() => setOver(false)}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={() => {
+        // уход с дочернего элемента тоже шлёт dragleave, считаем вход и выход парами
+        depth.current = Math.max(0, depth.current - 1);
+
+        if (depth.current === 0) {
+          setOver(false);
+        }
+      }}
       onDrop={(event) => {
         event.preventDefault();
+        depth.current = 0;
         setOver(false);
         void upload(event.dataTransfer.files);
       }}
@@ -65,8 +50,10 @@ export function MediaDrop({ entityId, children }: MediaDropProps) {
         ref={picker}
         type="file"
         multiple
-        accept="image/*,audio/*,video/*,.glb,.gltf,.zip,.pdf"
-        onChange={(event) => void upload(event.target.files)}
+        onChange={(event) => {
+          void upload(event.target.files);
+          event.target.value = '';
+        }}
         hidden
       />
 
@@ -74,8 +61,17 @@ export function MediaDrop({ entityId, children }: MediaDropProps) {
         + файл
       </button>
 
-      {over ? <span className="drop-note">отпустите файлы</span> : null}
-      {busy ? <span className="drop-note">грузится {busy}</span> : null}
+      {over ? <span className="drop-note">Отпустите файлы.</span> : null}
+
+      {progress ? (
+        <span className="drop-note">
+          Грузится {progressLabel(progress)}{' '}
+          <button type="button" onClick={cancel} className="frame px-1">
+            отменить
+          </button>
+        </span>
+      ) : null}
+
       {error ? <span className="drop-note">{error}</span> : null}
     </div>
   );

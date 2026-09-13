@@ -1,8 +1,9 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
-import { fileUrl } from '@/api/client';
+import { fileUrl } from '@/api/urls';
 import { formatEventPeriod } from '@/api/format';
 import type { EntityCard, GlobalEventView, MediaItem } from '@/api/types';
 
@@ -12,7 +13,7 @@ import { ApplicationsManager } from '@/components/entity/applications-manager';
 import { ScheduleManager } from '@/components/entity/schedule-manager';
 import { MediaManager } from '@/components/media/media-manager';
 import { Hint } from '@/components/ui/hint';
-import { SceneView } from '@/components/world/scene-view';
+import { StaticScreen } from '@/components/world/static-screen';
 import { routes } from '@/routes';
 
 import { AnnouncePanel } from './announce-panel';
@@ -20,6 +21,11 @@ import { FeedTape } from './feed-tape';
 import { SetupButton } from './home-admin';
 import { MediaQueue } from './media-queue';
 import { ScheduleStrip } from './schedule-strip';
+
+const SceneView = dynamic(() => import('@/components/world/scene-view').then((module) => module.SceneView), {
+  ssr: false,
+  loading: () => <StaticScreen>сцена грузится</StaticScreen>,
+});
 
 interface GlobalEventScreenProps {
   global: GlobalEventView;
@@ -66,30 +72,15 @@ export function GlobalEventScreen({
       }
       head={
         <div>
-          {preview ? <p className="hint">предпросмотр: обычный посетитель этого экрана ещё не видит</p> : null}
+          {preview ? <p className="hint">Предпросмотр: обычный посетитель этого экрана ещё не видит.</p> : null}
 
-          <strong>{formatEventPeriod(global.event.startsAt, global.event.endsAt)}</strong>
+          <strong className="headline">{formatEventPeriod(global.event.startsAt, global.event.endsAt)}</strong>
           {global.event.city ? <p>{global.event.city}</p> : null}
           {global.event.location ? <p>{global.event.location}</p> : null}
         </div>
       }
       meta={
         <div>
-          {manage ? (
-            <div className="mb-2">
-              <div className="flex flex-wrap gap-1">
-                <SetupButton />
-                <ScheduleManager eventId={global.card.id} entries={global.schedule} />
-                <ApplicationsManager eventId={global.card.id} />
-                <Link href={routes.entityEdit(global.card.ownerHandle, global.card.slug)} className="frame px-2 py-1">
-                  правка ивента
-                </Link>
-              </div>
-
-              <Hint>главная держится на галке «глобальный» и на датах ивента</Hint>
-            </div>
-          ) : null}
-
           {announcing ? (
             <AnnouncePanel
               eventId={global.card.id}
@@ -103,11 +94,28 @@ export function GlobalEventScreen({
         </div>
       }
       text={
-        <ExpandableText
-          title={global.card.title}
-          source={announcing && global.event.announceMd.trim() ? global.event.announceMd : global.descriptionMd}
-          media={media}
-        />
+        <div>
+          <ExpandableText
+            title={global.card.title}
+            source={announcing && global.event.announceMd.trim() ? global.event.announceMd : global.descriptionMd}
+            media={media}
+          />
+
+          {manage ? (
+            <div className="mt-2">
+              <div className="flex flex-wrap gap-1">
+                <SetupButton />
+                <ScheduleManager eventId={global.card.id} entries={global.schedule} />
+                <ApplicationsManager eventId={global.card.id} />
+                <Link href={routes.entityEdit(global.card.ownerHandle, global.card.slug)} className="frame px-2 py-1">
+                  правка ивента
+                </Link>
+              </div>
+
+              <Hint>Главная держится на галке «глобальный» и на датах ивента.</Hint>
+            </div>
+          ) : null}
+        </div>
       }
     />
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { fileUrl } from '@/api/client';
+import { fileUrl } from '@/api/urls';
 import type { MediaItem } from '@/api/types';
 
 import { useReading } from './reading';
@@ -30,7 +30,7 @@ export function MediaShelf({ media }: { media: MediaItem[] }) {
   return (
     <div className="mt-1">
       <strong>материалы</strong>
-      {photos > 0 ? <p className="hint">фото: {photos}</p> : null}
+      {photos > 0 ? <p className="hint">Фото: {photos}.</p> : null}
 
       <ul className="mt-1 flex flex-wrap gap-1">
         {shelf.map(({ item, index }) => {

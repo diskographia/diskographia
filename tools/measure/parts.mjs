@@ -1,6 +1,8 @@
 import sharp from 'sharp';
 
-const { data, info } = await sharp("D:/diskographia/сурсы/макет.jpg").resize({ width: 900, fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+// кнопки рейки и ручки в долях рамки макета: node tools/measure/parts.mjs сурсы/макет.jpg
+
+const { data, info } = await sharp(process.argv[2]).resize({ width: 900, fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 const px = (x, y) => {
   const i = (y * info.width + x) * info.channels;
   return { r: data[i], g: data[i + 1], b: data[i + 2] };

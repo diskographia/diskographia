@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AccessModule } from '../access/access.module.js';
 import { EntitiesModule } from '../entities/entities.module.js';
 import { IdentityModule } from '../identity/identity.module.js';
 
@@ -8,7 +9,7 @@ import { FeedService } from './feed.service.js';
 import { GlobalEventService } from './global-event.service.js';
 
 @Module({
-  imports: [EntitiesModule, IdentityModule],
+  imports: [AccessModule, EntitiesModule, IdentityModule],
   controllers: [FeedController],
   providers: [FeedService, GlobalEventService],
   exports: [FeedService, GlobalEventService],

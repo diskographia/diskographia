@@ -1,11 +1,10 @@
 'use client';
 
-
 import type { EntityDetail, EntityKind } from '@/api/types';
 
 import { DisplayAuthorInput } from './display-author-input';
-import { LinksInput } from './links-input';
-import { MetaFieldsInput } from './meta-fields-input';
+import { KIND_LABEL, VISIBILITY_LABEL } from './labels';
+import { PairsInput } from './pairs-input';
 import { PriceInput } from './price-input';
 
 interface EntityFieldsProps {
@@ -14,19 +13,7 @@ interface EntityFieldsProps {
   platform?: boolean;
 }
 
-const KIND_LABEL: Record<EntityKind, string> = {
-  content: 'контент',
-  product: 'товар',
-  event: 'ивент',
-  capsule: 'капсула',
-};
-
-const VISIBILITY: { value: string; label: string }[] = [
-  { value: 'draft', label: 'черновик' },
-  { value: 'private', label: 'только я' },
-  { value: 'unlisted', label: 'по ссылке' },
-  { value: 'public', label: 'публичный' },
-];
+const VISIBILITY = Object.entries(VISIBILITY_LABEL).map(([value, label]) => ({ value, label }));
 
 // datetime-local работает в местном времени, поэтому сдвигаем на смещение пояса
 function forInput(value: string | null | undefined): string {
@@ -39,11 +26,11 @@ function forInput(value: string | null | undefined): string {
   return new Date(moment.getTime() - moment.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-// паспорт объекта: то, без чего он не существует
+// паспорт предмета: то, без чего он не существует
 export function IdentityFields({ kind, entity }: { kind: EntityKind; entity?: EntityDetail }) {
   return (
     <>
-      <p className="hint">вид: {KIND_LABEL[kind]}</p>
+      <p className="hint">Вид: {KIND_LABEL[kind]}.</p>
 
       <label className="block">
         название
@@ -65,7 +52,6 @@ export function IdentityFields({ kind, entity }: { kind: EntityKind; entity?: En
         теги через запятую
         <input name="tags" defaultValue={entity?.tags.join(', ') ?? ''} className="frame block w-full p-1" />
       </label>
-
     </>
   );
 }
@@ -122,19 +108,31 @@ export function DetailFields({ kind, entity, platform = false }: EntityFieldsPro
             город
             <input name="city" defaultValue={entity?.event?.city ?? ''} className="frame block w-full p-1" />
           </label>
-          <div className="mt-2 flex gap-1">
-            <input
-              name="latitude"
-              defaultValue={entity?.event?.latitude ?? ''}
-              placeholder="широта, можно пусто"
-              className="frame w-1/2 p-1"
-            />
-            <input
-              name="longitude"
-              defaultValue={entity?.event?.longitude ?? ''}
-              placeholder="долгота"
-              className="frame w-1/2 p-1"
-            />
+          <div className="mt-2 flex flex-wrap gap-1">
+            <label className="min-w-40 flex-1">
+              широта, можно пусто
+              <input
+                name="latitude"
+                type="number"
+                step="any"
+                min={-90}
+                max={90}
+                defaultValue={entity?.event?.latitude ?? ''}
+                className="frame block w-full p-1"
+              />
+            </label>
+            <label className="min-w-40 flex-1">
+              долгота
+              <input
+                name="longitude"
+                type="number"
+                step="any"
+                min={-180}
+                max={180}
+                defaultValue={entity?.event?.longitude ?? ''}
+                className="frame block w-full p-1"
+              />
+            </label>
           </div>
           {platform ? (
             <label className="mt-2 block">
@@ -187,10 +185,29 @@ export function DetailFields({ kind, entity, platform = false }: EntityFieldsPro
         </fieldset>
       ) : null}
 
-      <LinksInput name="links" initial={entity?.links ?? []} />
-      <MetaFieldsInput name="meta" initial={entity?.meta ?? []} />
+      <PairsInput
+        name="links"
+        legend="ссылки"
+        initial={(entity?.links ?? []).map((link) => ({ first: link.label, second: link.url }))}
+        firstKey="label"
+        secondKey="url"
+        firstPlaceholder="подпись"
+        secondPlaceholder="https://"
+        secondType="url"
+        addLabel="добавить ссылку"
+        hint="На странице предмета они прячутся под звёздочкой в нижнем экране."
+      />
+      <PairsInput
+        name="meta"
+        legend="свои поля"
+        initial={(entity?.meta ?? []).map((field) => ({ first: field.label, second: field.value }))}
+        firstKey="label"
+        secondKey="value"
+        firstPlaceholder="подпись"
+        secondPlaceholder="значение"
+        addLabel="добавить поле"
+      />
       <DisplayAuthorInput initial={entity?.displayAuthor ?? null} />
-
     </>
   );
 }

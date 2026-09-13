@@ -19,7 +19,7 @@ const schema = z.object({
   DATABASE_POOL_SIZE: z.coerce.number().int().min(1).max(200).default(10),
 
   JWT_SECRET: z.string().min(32, 'секрет должен быть не короче 32 символов'),
-  JWT_TTL: z.string().default('7d'),
+  JWT_TTL: z.string().default('30d'),
 
   PORT: z.coerce.number().int().positive().default(4000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -32,7 +32,8 @@ const schema = z.object({
 
   PLATFORM_HANDLE: z.string().min(2).default('discography'),
   PLATFORM_EMAIL: z.string().min(3).default('admin@diskographia.test'),
-  PLATFORM_PASSWORD: z.string().min(8).default('diskographia-admin'),
+  // у секретов нет значений по умолчанию: забытая переменная должна валить запуск, а не заводить известный пароль
+  PLATFORM_PASSWORD: z.string().min(10, 'пароль учётки платформы не короче десяти знаков'),
   HOME_SELECTION_SLUG: z.string().min(1).default('home-selection'),
   HOME_SHOWCASE_SLUG: z.string().min(1).default('home-showcase'),
   PLATFORM_MANIFEST_SLUG: z.string().min(1).default('manifest'),

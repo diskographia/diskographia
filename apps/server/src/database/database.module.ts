@@ -17,7 +17,8 @@ export type Database = PostgresJsDatabase<typeof schema>;
       provide: DATABASE_CLIENT,
       useFactory: () => {
         const env = readEnv();
-        return postgres(env.DATABASE_URL, { max: env.DATABASE_POOL_SIZE });
+        // на медленной машине первое соединение занимает десятки секунд, штатных тридцати не хватает
+        return postgres(env.DATABASE_URL, { max: env.DATABASE_POOL_SIZE, connect_timeout: 90 });
       },
     },
     {

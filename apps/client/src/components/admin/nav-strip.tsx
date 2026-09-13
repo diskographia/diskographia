@@ -2,22 +2,54 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 export interface NavGroup {
   label: string;
   links: { href: string; label: string }[];
 }
 
-// полоса лежит поверх мира, поэтому её можно свернуть до одной кнопки
+const OPEN_KEY = 'diskographia-nav-open';
+const OPEN_EVENT = 'diskographia:nav';
+
+// свёрнутость помнится в localStorage; на сервере полоса всегда свёрнута, чтобы разметка совпала
+function subscribe(listen: () => void): () => void {
+  window.addEventListener(OPEN_EVENT, listen);
+  window.addEventListener('storage', listen);
+
+  return () => {
+    window.removeEventListener(OPEN_EVENT, listen);
+    window.removeEventListener('storage', listen);
+  };
+}
+
+function readOpen(): boolean {
+  try {
+    return localStorage.getItem(OPEN_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeOpen(value: boolean): void {
+  try {
+    localStorage.setItem(OPEN_KEY, String(value));
+  } catch {
+    // без localStorage полоса каждый раз свёрнута
+  }
+
+  window.dispatchEvent(new Event(OPEN_EVENT));
+}
+
+// полоса лежит поверх мира рядом с декой плеера, поэтому по умолчанию свёрнута до одной кнопки
 export function NavStrip({ groups }: { groups: NavGroup[] }) {
   const path = usePathname();
-  const [open, setOpen] = useState(true);
+  const open = useSyncExternalStore(subscribe, readOpen, () => false);
 
   return (
-    <nav className="nav" data-hold>
-      <button type="button" onClick={() => setOpen((value) => !value)} className="nav-toggle frame">
-        {open ? 'меню \u2039' : 'меню \u203a'}
+    <nav className="nav" data-hold aria-label="служебные страницы">
+      <button type="button" onClick={() => writeOpen(!open)} className="nav-toggle frame" aria-expanded={open}>
+        {open ? 'меню ‹' : 'меню ›'}
       </button>
 
       {open

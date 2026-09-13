@@ -31,11 +31,12 @@ export function Passage() {
         return;
       }
 
-      if (rail && (rail.dataset.href ?? '') === window.location.pathname) {
+      // клавиша, которая никуда не ведёт, логотип ожидания не зажигает
+      if (rail && (rail.hasAttribute('data-stay') || (rail.dataset.href ?? '') === window.location.pathname)) {
         return;
       }
 
-      // логотип только при переходе на другую страницу, выбор объекта идёт запросом
+      // логотип только при переходе на другую страницу, выбор предмета идёт запросом
       if (link) {
         const href = link.getAttribute('href') ?? '';
 
@@ -86,8 +87,10 @@ export function Passage() {
       <span ref={mark} hidden />
       {waiting ? (
         <div className="slot slot-feed passage" aria-live="polite">
-          <div className="screen slot-body">
-            <AsciiWait />
+          <div className="screen screen-feed">
+            <div className="slot-body">
+              <AsciiWait />
+            </div>
           </div>
         </div>
       ) : null}

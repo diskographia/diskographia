@@ -1,7 +1,10 @@
 import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
+import type { Response } from 'express';
 
 import type { AuthenticatedRequest } from './auth.guard.js';
 import { IdentityService } from './identity.service.js';
+import { tokenFrom } from './request-token.js';
+import { refreshCookie } from './session-cookie.js';
 
 // пускает всех, но своим отдаёт личность: по ней решается, виден ли черновик
 @Injectable()
@@ -10,11 +13,17 @@ export class OptionalAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const header = request.headers.authorization;
+    const token = tokenFrom(request);
 
-    if (header?.startsWith('Bearer ')) {
+    if (token) {
       try {
-        request.identity = await this.identityService.verifyToken(header.slice('Bearer '.length));
+        request.identity = await this.identityService.verifyToken(token);
+
+        const renewed = await this.identityService.renewIfStale(request.identity);
+
+        if (renewed) {
+          refreshCookie(request, context.switchToHttp().getResponse<Response>(), renewed);
+        }
       } catch {
         // просроченный токен читает как гость
       }

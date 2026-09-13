@@ -6,7 +6,7 @@ export interface PlatformContainer {
   visibility: 'draft' | 'public';
 }
 
-// заголовки видны админу в списке его объектов, поэтому по-русски
+// заголовки видны админу в списке его предметов, поэтому по-русски
 export function platformContainers(): PlatformContainer[] {
   const env = readEnv();
 

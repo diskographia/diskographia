@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const LINE = 18;
-const MIN_THUMB = 16;
+const LEDS = 14;
 
 // полоса живёт на ребре модуля и двигает экран построчно, рывками, как в старых окнах
 export function EdgeScroll({ target, className }: { target: string; className: string }) {
@@ -12,7 +12,6 @@ export function EdgeScroll({ target, className }: { target: string; className: s
   const track = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLElement | null>(null);
   const [ratio, setRatio] = useState(0);
-  const [part, setPart] = useState(1);
   const [scrolls, setScrolls] = useState(false);
   const [held, setHeld] = useState(false);
 
@@ -27,7 +26,6 @@ export function EdgeScroll({ target, className }: { target: string; className: s
 
     setScrolls(room > 4);
     setRatio(room > 0 ? node.scrollTop / room : 0);
-    setPart(node.scrollHeight > 0 ? node.clientHeight / node.scrollHeight : 1);
   }, []);
 
   useEffect(() => {
@@ -45,13 +43,25 @@ export function EdgeScroll({ target, className }: { target: string; className: s
     const watcher = new ResizeObserver(measure);
     watcher.observe(node);
 
-    for (const child of node.children) {
-      watcher.observe(child);
-    }
+    // содержимое экрана меняется без смены адреса: выбор в контейнере, ответ сервера
+    const watchChildren = () => {
+      for (const child of node.children) {
+        watcher.observe(child);
+      }
+    };
+
+    watchChildren();
+
+    const changes = new MutationObserver(() => {
+      watchChildren();
+      measure();
+    });
+    changes.observe(node, { childList: true, subtree: true });
 
     return () => {
       node.removeEventListener('scroll', measure);
       watcher.disconnect();
+      changes.disconnect();
     };
   }, [target, measure, path]);
 
@@ -84,23 +94,23 @@ export function EdgeScroll({ target, className }: { target: string; className: s
     return null;
   }
 
-  const thumb = Math.max(MIN_THUMB, part * 100);
+  // пролистанное покрывается горящими светодиодами, как уровень в эквалайзере: верхние два горят жёлтым
+  const lit = Math.round(ratio * LEDS);
 
   return (
-    <div className={`edge-rail ${className}`} data-hold>
-      <button
-        type="button"
-        className="edge-step"
-        onClick={() => step(-1)}
-        title="строкой выше"
-        aria-label="строкой выше"
-      >
+    <div className={`edge-rail ${className}`} data-hold title={`прокрутка: ${Math.round(ratio * 100)}%`}>
+      <button type="button" className="edge-step" onClick={() => step(-1)} title="строкой выше" aria-label="строкой выше">
         &#9650;
       </button>
 
       <div
         ref={track}
         className="edge-track"
+        role="slider"
+        aria-label="положение ленты"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(ratio * 100)}
         style={{ touchAction: 'none' }}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -118,19 +128,15 @@ export function EdgeScroll({ target, className }: { target: string; className: s
         }}
         onPointerCancel={() => setHeld(false)}
       >
-        <span
-          className="edge-handle"
-          style={{ height: `${thumb}%`, top: `${ratio * (100 - thumb)}%` }}
-        />
+        {Array.from({ length: LEDS }, (_, index) => {
+          const on = index < lit;
+          const peak = on && index >= lit - 2;
+
+          return <span key={index} className={`led${on ? (peak ? ' led-peak' : ' led-on') : ''}`} />;
+        })}
       </div>
 
-      <button
-        type="button"
-        className="edge-step"
-        onClick={() => step(1)}
-        title="строкой ниже"
-        aria-label="строкой ниже"
-      >
+      <button type="button" className="edge-step" onClick={() => step(1)} title="строкой ниже" aria-label="строкой ниже">
         &#9660;
       </button>
     </div>

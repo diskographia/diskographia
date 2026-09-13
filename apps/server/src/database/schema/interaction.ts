@@ -4,7 +4,7 @@ import { createdAt } from './columns.js';
 import { entities } from './entity.js';
 import { profiles } from './profile.js';
 
-// одна строка на пару «объект и человек», гости не считаются
+// одна строка на пару «предмет и человек», гости не считаются
 export const entityViews = pgTable(
   'entity_views',
   {

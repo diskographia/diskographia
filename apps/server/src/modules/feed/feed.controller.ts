@@ -1,11 +1,13 @@
-import { Body, Controller, Delete, Get, Headers, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 
 import { scheduleEntrySchema, type ScheduleEntryInput } from '@diskographia/shared';
 
 import { ZodValidationPipe } from '../../validation/zod-validation.pipe.js';
+import { AccessService } from '../access/access.service.js';
 import { AuthGuard } from '../identity/auth.guard.js';
-import { CurrentIdentity } from '../identity/current-identity.decorator.js';
-import { IdentityService, type Identity } from '../identity/identity.service.js';
+import { CurrentIdentity, ViewerId } from '../identity/current-identity.decorator.js';
+import type { Identity } from '../identity/identity.service.js';
+import { OptionalAuthGuard } from '../identity/optional-auth.guard.js';
 import { FeedService } from './feed.service.js';
 import { GlobalEventService } from './global-event.service.js';
 
@@ -14,15 +16,13 @@ export class FeedController {
   constructor(
     private readonly feedService: FeedService,
     private readonly globalEvent: GlobalEventService,
-    private readonly identity: IdentityService,
+    private readonly access: AccessService,
   ) {}
 
   @Get('home')
-  home(@Headers('authorization') authorization?: string) {
-    return this.identity
-      .verifyToken((authorization ?? '').replace('Bearer ', ''))
-      .then((viewer) => this.feedService.home(viewer.profileId))
-      .catch(() => this.feedService.home(null));
+  @UseGuards(OptionalAuthGuard)
+  home(@ViewerId() viewerId: string | null) {
+    return this.feedService.home(viewerId);
   }
 
   @Get('manifest')
@@ -31,7 +31,10 @@ export class FeedController {
   }
 
   @Get('events/:id/schedule')
-  schedule(@Param('id') id: string) {
+  @UseGuards(OptionalAuthGuard)
+  async schedule(@ViewerId() viewerId: string | null, @Param('id') id: string) {
+    await this.access.readable(id, viewerId);
+
     return this.globalEvent.schedule(id);
   }
 
@@ -51,7 +54,7 @@ export class FeedController {
     return this.globalEvent.removeScheduleEntry(entryId, identity.profileId);
   }
 
-  // админ правит главную обычными ручками контейнеров, здесь только их адреса
+  // платформа правит главную обычными ручками контейнеров, здесь только их адреса
   @Get('home/containers/:slug')
   containerId(@Param('slug') slug: string) {
     return this.feedService.containerIdBySlug(slug).then((id) => ({ id }));

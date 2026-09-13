@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import { DATABASE, type Database } from '../../database/database.module.js';
+import { AccessService } from '../access/access.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { entities, entityChildren, entityFeedback, profileFeedback, profiles } from '../../database/schema/index.js';
 
@@ -10,18 +11,29 @@ export class FeedbackService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly notifications: NotificationsService,
+    private readonly access: AccessService,
   ) {}
 
   async giveToEntity(entityId: string, profileId: string, fromCapsuleId?: string) {
     const [target] = await this.db
-      .select({ id: entities.id, ownerId: entities.ownerId, title: entities.title })
+      .select({
+        id: entities.id,
+        ownerId: entities.ownerId,
+        title: entities.title,
+        slug: entities.slug,
+        visibility: entities.visibility,
+        ownerHandle: profiles.handle,
+      })
       .from(entities)
+      .innerJoin(profiles, eq(profiles.id, entities.ownerId))
       .where(and(eq(entities.id, entityId), isNull(entities.deletedAt)))
       .limit(1);
 
     if (!target) {
-      throw new NotFoundException('объект не найден');
+      throw new NotFoundException('предмет не найден');
     }
+
+    await this.access.assertReadable(target, profileId);
 
     await this.db.transaction(async (tx) => {
       await tx
@@ -42,6 +54,7 @@ export class FeedbackService {
         entityId,
         entityTitle: target.title,
         profileId,
+        target: { handle: target.ownerHandle, slug: target.slug },
       });
     }
 
@@ -118,7 +131,7 @@ export class FeedbackService {
       .limit(1);
 
     if (!link) {
-      throw new BadRequestException('объект не лежит в этой капсуле');
+      throw new BadRequestException('предмет не лежит в этой капсуле');
     }
 
     const [capsule] = await tx.select().from(entities).where(eq(entities.id, capsuleId)).limit(1);

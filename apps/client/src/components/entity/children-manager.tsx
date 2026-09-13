@@ -3,8 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { request } from '@/api/browser';
 import type { ChildLink, EntityCard, EntityKind } from '@/api/types';
-import { failureText } from '@/api/failure';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Modal } from '@/components/modal';
 
 interface ChildrenManagerProps {
@@ -20,7 +21,32 @@ export function ChildrenManager({ parentId, parentKind, nested, candidates, canP
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const inside = new Set(nested.map((item) => item.entity.id));
+
+  const wanted = query.trim().toLowerCase();
+  const free = candidates.filter(
+    (card) =>
+      !inside.has(card.id) &&
+      card.id !== parentId &&
+      (!wanted || `${card.title} ${card.tags.join(' ')}`.toLowerCase().includes(wanted)),
+  );
+
+  async function call(path: string, method: string, body?: unknown): Promise<void> {
+    setBusy(true);
+    setError(null);
+
+    const answer = await request(path, method, body);
+
+    setBusy(false);
+
+    if (!answer.ok) {
+      setError(answer.error);
+      return;
+    }
+
+    router.refresh();
+  }
 
   async function move(index: number, shift: number): Promise<void> {
     const target = index + shift;
@@ -36,25 +62,6 @@ export function ChildrenManager({ parentId, parentKind, nested, candidates, canP
       order: order.map((childId, slotIndex) => ({ childId, slotIndex })),
     });
   }
-  const free = candidates.filter((card) => !inside.has(card.id) && card.id !== parentId);
-
-  async function call(path: string, method: string, body?: unknown): Promise<void> {
-    setBusy(true);
-    setError(null);
-
-    const response = await fetch(`/api${path}`, {
-      method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-
-    if (!response.ok) {
-      setError(await failureText(response));
-    }
-
-    setBusy(false);
-    router.refresh();
-  }
 
   return (
     <>
@@ -63,16 +70,14 @@ export function ChildrenManager({ parentId, parentKind, nested, candidates, canP
       </button>
 
       <Modal title="что лежит внутри контейнера" open={open} onClose={() => setOpen(false)}>
-        {error ? <p>ошибка: {error}</p> : null}
+        {error ? <p>Ошибка: {error}</p> : null}
 
-        <p className="hint">
-          контейнер сам ничего не создаёт: сюда кладутся готовые объекты, снизу список того, что можно положить
-        </p>
+        <p className="hint">Контейнер сам ничего не создаёт: сюда кладутся готовые предметы, снизу список того, что можно положить.</p>
 
         <strong className="mt-2 block">внутри</strong>
         <ul className="mt-2">
           {nested.map((item, index) => (
-            <li key={item.entity.id} className="frame mb-2 flex items-center gap-2 p-2">
+            <li key={item.entity.id} className="frame mb-2 flex flex-wrap items-center gap-2 p-2">
               <span className="flex-1">
                 {item.entity.title}
                 {item.link.pinnedAt ? ' (закреплено)' : null}
@@ -85,6 +90,7 @@ export function ChildrenManager({ parentId, parentKind, nested, candidates, canP
                     disabled={busy || index === 0}
                     onClick={() => void move(index, -1)}
                     aria-label="выше"
+                    title="выше"
                     className="frame px-2"
                   >
                     &uarr;
@@ -94,6 +100,7 @@ export function ChildrenManager({ parentId, parentKind, nested, candidates, canP
                     disabled={busy || index === nested.length - 1}
                     onClick={() => void move(index, 1)}
                     aria-label="ниже"
+                    title="ниже"
                     className="frame px-2"
                   >
                     &darr;
@@ -101,14 +108,13 @@ export function ChildrenManager({ parentId, parentKind, nested, candidates, canP
                 </>
               ) : null}
 
-              <button
-                type="button"
+              <ConfirmButton
+                label="убрать"
+                title="убрать из контейнера"
+                question={<p>«{item.entity.title}» пропадёт из этого контейнера. Сам предмет останется у автора.</p>}
                 disabled={busy}
-                onClick={() => void call(`/entities/${parentId}/children/${item.entity.id}`, 'DELETE')}
-                className="frame px-2"
-              >
-                убрать
-              </button>
+                onConfirm={() => call(`/entities/${parentId}/children/${item.entity.id}`, 'DELETE')}
+              />
 
               {canPin && parentKind === 'event' ? (
                 <button
@@ -129,9 +135,19 @@ export function ChildrenManager({ parentId, parentKind, nested, candidates, canP
           ))}
         </ul>
 
-        {nested.length === 0 ? <p>пусто</p> : null}
+        {nested.length === 0 ? <p>Пусто.</p> : null}
 
         <strong className="mt-4 block">положить внутрь</strong>
+
+        {candidates.length > 8 ? (
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="найти среди своих: название или тег"
+            className="frame mt-1 block w-full p-1"
+          />
+        ) : null}
+
         <ul className="mt-2">
           {free.map((card) => (
             <li key={card.id} className="frame mb-2 flex items-center gap-2 p-2">
@@ -149,7 +165,11 @@ export function ChildrenManager({ parentId, parentKind, nested, candidates, canP
         </ul>
 
         {free.length === 0 ? (
-          <p>класть нечего: все ваши объекты уже внутри, сначала создайте новый на странице создания</p>
+          <p>
+            {wanted
+              ? 'Ничего не нашлось.'
+              : 'Класть нечего: все ваши предметы уже внутри, сначала создайте новый на странице создания.'}
+          </p>
         ) : null}
       </Modal>
     </>

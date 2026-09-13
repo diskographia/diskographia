@@ -14,7 +14,7 @@ export default async function CreatePage() {
 
   return (
     <>
-      <Here place="создание объекта" />
+      <Here place="создание предмета" />
       <CreateForm platform={viewer.isAdmin} />
     </>
   );

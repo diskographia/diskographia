@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, type OnApplicationBootstrap } from '@nestjs/common';
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 
 import { DATABASE, type Database } from '../../database/database.module.js';
 import { entities, entityChildren, profiles } from '../../database/schema/index.js';
@@ -44,9 +44,11 @@ export class FeedService implements OnApplicationBootstrap {
 
   // пока идёт глобальный ивент, главная это он
   async home(viewerId: string | null = null) {
+    const platform = await this.findPlatform();
+
     const [selection, showcase, global] = await Promise.all([
-      this.readContainer(this.env.HOME_SELECTION_SLUG),
-      this.readContainer(this.env.HOME_SHOWCASE_SLUG),
+      this.readContainer(platform, this.env.HOME_SELECTION_SLUG),
+      this.readContainer(platform, this.env.HOME_SHOWCASE_SLUG),
       this.globalEvent.current(await this.globalEvent.isPlatform(viewerId)),
     ]);
 
@@ -148,15 +150,13 @@ export class FeedService implements OnApplicationBootstrap {
     const [platform] = await this.db
       .select({ id: profiles.id })
       .from(profiles)
-      .where(sql`lower(${profiles.handle}) = lower(${this.env.PLATFORM_HANDLE})`)
+      .where(and(eq(profiles.isPlatform, true), isNull(profiles.deletedAt)))
       .limit(1);
 
     return platform;
   }
 
-  private async readContainer(slug: string) {
-    const platform = await this.findPlatform();
-
+  private async readContainer(platform: { id: string } | undefined, slug: string) {
     if (!platform) {
       return [];
     }

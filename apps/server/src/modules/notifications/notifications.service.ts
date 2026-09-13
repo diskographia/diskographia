@@ -78,7 +78,14 @@ export class NotificationsService {
       return found;
     }
 
-    const [created] = await this.db.insert(profileSettings).values({ profileId }).returning();
+    // два первых чтения подряд не должны спорить за одну строку
+    await this.db.insert(profileSettings).values({ profileId }).onConflictDoNothing();
+
+    const [created] = await this.db
+      .select()
+      .from(profileSettings)
+      .where(eq(profileSettings.profileId, profileId))
+      .limit(1);
 
     return created!;
   }

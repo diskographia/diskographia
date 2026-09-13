@@ -3,9 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { failureText } from '@/api/failure';
+import { request } from '@/api/browser';
 
-// инвентарь профиля собирается из объектов с номером ячейки
+// инвентарь профиля собирается из предметов с номером ячейки
 export function InventoryToggle({ entityId, slotIndex }: { entityId: string; slotIndex: number | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -17,17 +17,15 @@ export function InventoryToggle({ entityId, slotIndex }: { entityId: string; slo
     setBusy(true);
     setError(null);
 
-    const response = await fetch(`/api/entities/${entityId}/inventory-slot`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slotIndex: inside ? null : 0 }),
-    });
-
-    if (!response.ok) {
-      setError(await failureText(response));
-    }
+    const answer = await request(`/entities/${entityId}/inventory-slot`, 'PUT', { slotIndex: inside ? null : 0 });
 
     setBusy(false);
+
+    if (!answer.ok) {
+      setError(answer.error);
+      return;
+    }
+
     router.refresh();
   }
 

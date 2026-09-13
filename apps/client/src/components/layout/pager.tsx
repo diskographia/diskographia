@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 const GAP = 12;
@@ -8,9 +9,17 @@ const GAP = 12;
 export function Pager({ children }: { children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const flow = useRef<HTMLDivElement>(null);
+  const path = usePathname();
   const [width, setWidth] = useState(0);
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(0);
+  const [seen, setSeen] = useState(path);
+
+  // пейджер переживает переход между страницами, а номер страницы с прошлого адреса ему не нужен
+  if (seen !== path) {
+    setSeen(path);
+    setPage(0);
+  }
 
   const measure = useCallback(() => {
     const inner = flow.current;
@@ -46,17 +55,47 @@ export function Pager({ children }: { children: ReactNode }) {
     const watcher = new ResizeObserver(measure);
     watcher.observe(outer);
 
-    const changes = new MutationObserver(measure);
+    // свои же перестановки колонок в замер не попадают, иначе замер зовёт сам себя
+    const changes = new MutationObserver((records) => {
+      if (records.some((record) => record.target !== inner || record.type !== 'attributes')) {
+        measure();
+      }
+    });
     changes.observe(inner, { childList: true, subtree: true, characterData: true, attributes: true });
+
+    // браузер сам прокручивает спрятанное переполнение к фокусу: возвращаем и показываем нужную страницу
+    const onFocus = (event: FocusEvent) => {
+      const target = event.target as HTMLElement | null;
+
+      if (!target || !inner.contains(target) || width <= 0) {
+        return;
+      }
+
+      const shift = target.getBoundingClientRect().left - inner.getBoundingClientRect().left;
+
+      outer.scrollLeft = 0;
+      setPage(Math.max(0, Math.min(pages - 1, Math.floor(shift / (width + GAP)))));
+    };
+
+    const onScroll = () => {
+      if (outer.scrollLeft !== 0) {
+        outer.scrollLeft = 0;
+      }
+    };
+
+    outer.addEventListener('focusin', onFocus);
+    outer.addEventListener('scroll', onScroll);
 
     const later = window.setTimeout(measure, 300);
 
     return () => {
       watcher.disconnect();
       changes.disconnect();
+      outer.removeEventListener('focusin', onFocus);
+      outer.removeEventListener('scroll', onScroll);
       window.clearTimeout(later);
     };
-  }, [measure]);
+  }, [measure, width, pages]);
 
   return (
     <div ref={box} className="pager">

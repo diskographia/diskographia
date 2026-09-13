@@ -4,44 +4,32 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-import { failureText } from '@/api/failure';
+import { request } from '@/api/browser';
+import type { ParentPlace } from '@/api/types';
 import { Modal } from '@/components/modal';
 import { routes } from '@/routes';
 
-interface Parent {
-  parentId: string;
-  title: string;
-  slug: string;
-  ownerHandle: string;
-  mine: boolean;
-  status: 'pending' | 'approved' | 'declined';
-}
-
-const STATUS: Record<Parent['status'], string> = {
+const STATUS: Record<ParentPlace['status'], string> = {
   pending: 'ждёт вашего согласия',
   approved: 'лежит',
   declined: 'вы отказали',
 };
 
-// автор видит, куда его объект положили, и решает по чужим контейнерам
+// автор видит, куда его предмет положили, и решает по чужим контейнерам
 export function ParentsPanel({ entityId }: { entityId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [places, setPlaces] = useState<Parent[]>([]);
+  const [places, setPlaces] = useState<ParentPlace[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const read = useCallback(async (): Promise<Parent[]> => {
-    const response = await fetch(`/api/entities/${entityId}/parents`);
-
-    return response.ok ? ((await response.json()) as Parent[]) : [];
-  }, [entityId]);
+  const read = useCallback(() => request<ParentPlace[]>(`/entities/${entityId}/parents`), [entityId]);
 
   useEffect(() => {
     let alive = true;
 
-    void read().then((rows) => {
+    void read().then((answer) => {
       if (alive) {
-        setPlaces(rows);
+        setPlaces(answer.data ?? []);
       }
     });
 
@@ -51,17 +39,14 @@ export function ParentsPanel({ entityId }: { entityId: string }) {
   }, [read]);
 
   async function resolve(parentId: string, approve: boolean): Promise<void> {
-    const response = await fetch(
-      `/api/entities/${parentId}/children/${entityId}/${approve ? 'approve' : 'decline'}`,
-      { method: 'POST' },
-    );
+    const answer = await request(`/entities/${parentId}/children/${entityId}/${approve ? 'approve' : 'decline'}`, 'POST');
 
-    if (!response.ok) {
-      setError(await failureText(response));
+    if (!answer.ok) {
+      setError(answer.error);
       return;
     }
 
-    setPlaces(await read());
+    setPlaces((await read()).data ?? []);
     router.refresh();
   }
 
@@ -78,12 +63,12 @@ export function ParentsPanel({ entityId }: { entityId: string }) {
         {waiting > 0 ? `, ждут ${waiting}` : ''})
       </button>
 
-      <Modal title="где лежит этот объект" open={open} onClose={() => setOpen(false)}>
-        {error ? <p>ошибка: {error}</p> : null}
+      <Modal title="где лежит этот предмет" open={open} onClose={() => setOpen(false)}>
+        {error ? <p>Ошибка: {error}</p> : null}
 
         <ul>
           {places.map((place) => (
-            <li key={place.parentId} className="frame mb-2 flex items-center gap-2 p-2">
+            <li key={place.parentId} className="frame mb-2 flex flex-wrap items-center gap-2 p-2">
               <span className="flex-1">
                 <Link href={routes.entity(place.ownerHandle, place.slug)} className="underline">
                   {place.title}

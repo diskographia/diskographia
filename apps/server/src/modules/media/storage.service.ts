@@ -20,7 +20,11 @@ export interface StoredFile {
 export class StorageService {
   private readonly root = readEnv().UPLOADS_DIR;
 
-  async store(source: Readable, originalName: string): Promise<StoredFile> {
+  async store(
+    source: Readable,
+    originalName: string,
+    knownPath?: (sha256: string) => Promise<string | null>,
+  ): Promise<StoredFile> {
     const temporaryPath = await this.reserveTemporaryPath();
     const hash = createHash('sha256');
     let sizeBytes = 0;
@@ -44,10 +48,19 @@ export class StorageService {
     }
 
     const sha256 = hash.digest('hex');
+
+    // тот же хеш уже лежит на диске: путь из базы, новая копия не нужна
+    const earlier = knownPath ? await knownPath(sha256) : null;
+
+    if (earlier && (await this.exists(earlier))) {
+      await rm(temporaryPath, { force: true });
+      return { sha256, path: earlier, sizeBytes, reused: true };
+    }
+
     const relativePath = this.buildPath(sha256, extname(originalName).toLowerCase());
     const absolutePath = join(this.root, relativePath);
 
-    if (await this.exists(absolutePath)) {
+    if (await this.exists(relativePath)) {
       await rm(temporaryPath, { force: true });
       return { sha256, path: relativePath, sizeBytes, reused: true };
     }
@@ -91,9 +104,9 @@ export class StorageService {
     return join(directory, `${Date.now()}-${Math.random().toString(36).slice(2)}.part`);
   }
 
-  private async exists(path: string): Promise<boolean> {
+  async exists(relativePath: string): Promise<boolean> {
     try {
-      await stat(path);
+      await stat(this.absolutePath(relativePath));
       return true;
     } catch {
       return false;

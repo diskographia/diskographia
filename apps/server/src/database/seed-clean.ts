@@ -13,6 +13,8 @@ const TABLES = [
   'event_participants',
   'event_schedule',
   'entity_meta',
+  'entity_links',
+  'entity_transfers',
   'entity_display_authors',
   'entity_collaborators',
   'role_permissions',
@@ -26,7 +28,9 @@ const TABLES = [
   'files',
   'tags',
   'profile_tags',
+  'profile_settings',
   'profiles',
+  'sessions',
   'accounts',
 ];
 

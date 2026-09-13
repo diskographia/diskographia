@@ -3,19 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-import { failureText } from '@/api/failure';
+import { request } from '@/api/browser';
+import type { EventApplication } from '@/api/types';
 import { Modal } from '@/components/modal';
 
-interface Application {
-  profileId: string;
-  handle: string;
-  status: 'pending' | 'accepted' | 'declined';
-  attachedEntityId: string | null;
-  attending: boolean;
-  createdAt: string;
-}
-
-const STATUS: Record<Application['status'], string> = {
+const STATUS: Record<EventApplication['status'], string> = {
   pending: 'ждёт',
   accepted: 'принята',
   declined: 'отклонена',
@@ -24,16 +16,10 @@ const STATUS: Record<Application['status'], string> = {
 export function ApplicationsManager({ eventId }: { eventId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<Application[] | null>(null);
+  const [items, setItems] = useState<EventApplication[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const read = useCallback(async (): Promise<{ items: Application[]; error: string | null }> => {
-    const response = await fetch(`/api/events/${eventId}/applications`);
-
-    return response.ok
-      ? { items: (await response.json()) as Application[], error: null }
-      : { items: [], error: await failureText(response) };
-  }, [eventId]);
+  const read = useCallback(() => request<EventApplication[]>(`/events/${eventId}/applications`), [eventId]);
 
   useEffect(() => {
     if (!open) {
@@ -42,10 +28,10 @@ export function ApplicationsManager({ eventId }: { eventId: string }) {
 
     let alive = true;
 
-    void read().then((result) => {
+    void read().then((answer) => {
       if (alive) {
-        setItems(result.items);
-        setError(result.error);
+        setItems(answer.data ?? []);
+        setError(answer.error);
       }
     });
 
@@ -55,21 +41,17 @@ export function ApplicationsManager({ eventId }: { eventId: string }) {
   }, [open, read]);
 
   async function resolve(profileId: string, accept: boolean, withWork: boolean): Promise<void> {
-    const response = await fetch(`/api/events/${eventId}/applications/${profileId}/resolve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accept, withWork }),
-    });
+    const answer = await request(`/events/${eventId}/applications/${profileId}/resolve`, 'POST', { accept, withWork });
 
-    if (!response.ok) {
-      setError(await failureText(response));
+    if (!answer.ok) {
+      setError(answer.error);
       return;
     }
 
-    const result = await read();
+    const fresh = await read();
 
-    setItems(result.items);
-    setError(result.error);
+    setItems(fresh.data ?? []);
+    setError(fresh.error);
     router.refresh();
   }
 
@@ -89,14 +71,14 @@ export function ApplicationsManager({ eventId }: { eventId: string }) {
       </button>
 
       <Modal title="заявки на участие" open={open} onClose={() => setOpen(false)} half>
-        {error ? <p>ошибка: {error}</p> : null}
-        {items === null && !error ? <p>загружается</p> : null}
-        {items !== null && items.length === 0 ? <p>заявок нет</p> : null}
+        {error ? <p>Ошибка: {error}</p> : null}
+        {items === null && !error ? <p>Загружается.</p> : null}
+        {items !== null && items.length === 0 ? <p>Заявок нет.</p> : null}
 
         <ul>
           {(items ?? []).map((item) => (
             <li key={item.profileId} className="frame mb-2 p-2">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="flex-1">
                   @{item.handle} {STATUS[item.status]}
                   {item.attachedEntityId ? ', с работой' : ''}
@@ -128,7 +110,7 @@ export function ApplicationsManager({ eventId }: { eventId: string }) {
           ))}
         </ul>
 
-        {pending.length > 0 ? <p>нерассмотренных: {pending.length}</p> : null}
+        {pending.length > 0 ? <p>Нерассмотренных: {pending.length}</p> : null}
       </Modal>
     </>
   );

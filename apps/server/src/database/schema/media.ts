@@ -4,7 +4,7 @@ import { createdAt, primaryId } from './columns.js';
 import { entities } from './entity.js';
 import { mediaKind } from './enums.js';
 
-// одна строка на файл при любом числе объектов
+// одна строка на файл при любом числе предметов
 export const files = pgTable('files', {
   id: primaryId(),
   sha256: char('sha256', { length: 64 }).notNull().unique(),

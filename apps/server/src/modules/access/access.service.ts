@@ -101,7 +101,7 @@ export class AccessService {
     }
 
     if (profile.id === actorId) {
-      throw new BadRequestException('владелец уже автор объекта');
+      throw new BadRequestException('владелец уже автор предмета');
     }
 
     const [added] = await this.db
@@ -113,7 +113,13 @@ export class AccessService {
       })
       .returning();
 
-    await this.notifications.send(profile.id, 'collaborator_added', { entityId, ...(await this.titleOf(entityId)) });
+    const about = await this.titleOf(entityId);
+
+    await this.notifications.send(profile.id, 'collaborator_added', {
+      entityId,
+      title: about.title,
+      target: { handle: about.ownerHandle, slug: about.slug },
+    });
 
     return added;
   }
@@ -121,11 +127,22 @@ export class AccessService {
   async removeCollaborator(entityId: string, actorId: string, profileId: string) {
     await this.requireOwner(entityId, actorId);
 
-    await this.db
+    const [removed] = await this.db
       .delete(entityCollaborators)
-      .where(and(eq(entityCollaborators.entityId, entityId), eq(entityCollaborators.profileId, profileId)));
+      .where(and(eq(entityCollaborators.entityId, entityId), eq(entityCollaborators.profileId, profileId)))
+      .returning();
 
-    await this.notifications.send(profileId, 'collaborator_removed', { entityId, ...(await this.titleOf(entityId)) });
+    if (!removed) {
+      throw new NotFoundException('такого соавтора у предмета нет');
+    }
+
+    const about = await this.titleOf(entityId);
+
+    await this.notifications.send(profileId, 'collaborator_removed', {
+      entityId,
+      title: about.title,
+      target: { handle: about.ownerHandle, slug: about.slug },
+    });
   }
 
   private async titleOf(entityId: string): Promise<{ title: string; slug: string; ownerHandle: string }> {
@@ -179,7 +196,7 @@ export class AccessService {
     return { owner: false, ...allowed };
   }
 
-  // черновик и приватный видят только владелец и соавторы, остальным как будто объекта нет
+  // черновик и приватный видят только владелец и соавторы, остальным как будто предмета нет
   async assertReadable(entity: { id: string; ownerId: string; visibility: string }, viewerId: string | null) {
     if (entity.visibility === 'public' || entity.visibility === 'unlisted') {
       return;
@@ -189,7 +206,7 @@ export class AccessService {
       return;
     }
 
-    throw new NotFoundException('объект не найден');
+    throw new NotFoundException('предмет не найден');
   }
 
   async readable(entityId: string, viewerId: string | null) {
@@ -200,7 +217,7 @@ export class AccessService {
       .limit(1);
 
     if (!found) {
-      throw new NotFoundException('объект не найден');
+      throw new NotFoundException('предмет не найден');
     }
 
     await this.assertReadable(found, viewerId);
@@ -244,7 +261,7 @@ export class AccessService {
       .limit(1);
 
     if (!owned) {
-      throw new ForbiddenException('соавторов назначает владелец объекта');
+      throw new ForbiddenException('соавторов назначает владелец предмета');
     }
 
     return owned;

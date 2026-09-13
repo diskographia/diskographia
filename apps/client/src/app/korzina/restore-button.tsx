@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { failureText } from '@/api/failure';
+import { request } from '@/api/browser';
 
 export function RestoreButton({ entityId }: { entityId: string }) {
   const router = useRouter();
@@ -14,15 +14,15 @@ export function RestoreButton({ entityId }: { entityId: string }) {
     setBusy(true);
     setError(null);
 
-    const response = await fetch(`/api/entities/${entityId}/restore`, { method: 'POST' });
+    const answer = await request(`/entities/${entityId}/restore`, 'POST');
 
-    if (!response.ok) {
-      setError(await failureText(response));
-      setBusy(false);
+    setBusy(false);
+
+    if (!answer.ok) {
+      setError(answer.error);
       return;
     }
 
-    setBusy(false);
     router.refresh();
   }
 

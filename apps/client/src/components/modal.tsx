@@ -14,19 +14,26 @@ interface ModalProps {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-// оформления пока нет, только рамка и заголовок
 export function Modal({ title, open, onClose, children, half = false }: ModalProps) {
   const box = useRef<HTMLDivElement>(null);
   const pressedOutside = useRef(false);
   const returnTo = useRef<HTMLElement | null>(null);
+  const close = useRef(onClose);
 
+  useEffect(() => {
+    close.current = onClose;
+  });
+
+  // фокус ставится один раз на открытие: перерисовки родителя его не трогают
   useEffect(() => {
     if (!open) {
       return;
     }
 
     returnTo.current = document.activeElement as HTMLElement | null;
-    box.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+
+    const stops = [...(box.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
+    (stops.find((node) => !node.classList.contains('sheet-close')) ?? stops[0])?.focus();
 
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -34,7 +41,7 @@ export function Modal({ title, open, onClose, children, half = false }: ModalPro
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        onClose();
+        close.current();
         return;
       }
 
@@ -42,9 +49,9 @@ export function Modal({ title, open, onClose, children, half = false }: ModalPro
         return;
       }
 
-      const stops = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
-      const first = stops[0];
-      const last = stops[stops.length - 1];
+      const ring = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      const first = ring[0];
+      const last = ring[ring.length - 1];
 
       if (!first || !last) {
         return;
@@ -66,7 +73,7 @@ export function Modal({ title, open, onClose, children, half = false }: ModalPro
       document.body.style.overflow = overflow;
       returnTo.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || typeof document === 'undefined') {
     return null;
@@ -75,8 +82,7 @@ export function Modal({ title, open, onClose, children, half = false }: ModalPro
   // холст двигает панель трансформом, поэтому модалка живёт в body
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.4)' }}
+      className="sheet-veil"
       onMouseDown={(event) => {
         pressedOutside.current = event.target === event.currentTarget;
       }}
@@ -88,21 +94,10 @@ export function Modal({ title, open, onClose, children, half = false }: ModalPro
         pressedOutside.current = false;
       }}
     >
-      <div
-        ref={box}
-        role="dialog"
-        aria-modal
-        aria-label={title}
-        data-hold
-        className="sheet relative"
-        style={{
-          width: half ? 'min(max(58vw, 420px), 980px, 96vw)' : 'min(760px, 96vw)',
-          maxHeight: '88dvh',
-        }}
-      >
+      <div ref={box} role="dialog" aria-modal aria-label={title} data-hold className={`sheet${half ? ' sheet-wide' : ''}`}>
         <button type="button" onClick={onClose} className="sheet-close" title="закрыть" aria-label="закрыть" />
 
-        <div className="overflow-auto" style={{ maxHeight: 'calc(88dvh - 200px)' }}>
+        <div className="sheet-body">
           <strong>{title}</strong>
           <div className="mt-2">{children}</div>
         </div>

@@ -14,8 +14,11 @@ diskographia.ru, www.diskographia.ru {
 		X-Content-Type-Options nosniff
 		X-Frame-Options SAMEORIGIN
 		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
 	}
 
+	# api уходит сразу серверу: кука с токеном читается им самим, next в этой цепочке не нужен
 	handle /api/* {
 		reverse_proxy 127.0.0.1:4000 {
 			flush_interval -1
@@ -36,6 +39,13 @@ files.diskographia.ru {
 		X-Content-Type-Options nosniff
 		Content-Security-Policy "default-src 'none'; sandbox"
 		Cross-Origin-Resource-Policy cross-origin
-		Cache-Control "public, max-age=2592000"
+		Cache-Control "public, max-age=2592000, immutable"
+		-Server
 	}
+
+	# всё, кроме картинок и медиа, скачивается, а не показывается: то же правило, что в uploads.static.ts
+	@download {
+		not path *.jpg *.jpeg *.png *.webp *.avif *.gif *.mp3 *.flac *.wav *.ogg *.mp4 *.webm *.mov
+	}
+	header @download Content-Disposition attachment
 }

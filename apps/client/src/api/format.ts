@@ -6,6 +6,7 @@ const dateTime = new Intl.DateTimeFormat('ru-RU', {
   minute: '2-digit',
 });
 
+const time = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
 export function formatEventPeriod(startsAt: string, endsAt: string | null): string {
   const start = new Date(startsAt);
@@ -18,7 +19,6 @@ export function formatEventPeriod(startsAt: string, endsAt: string | null): stri
   const sameDay = start.toDateString() === end.toDateString();
 
   if (sameDay) {
-    const time = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
     return `${dateTime.format(start)} - ${time.format(end)}`;
   }
 

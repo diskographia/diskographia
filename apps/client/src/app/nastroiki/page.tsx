@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 
-import { apiGet } from '@/api/client';
-import { authHeaders } from '@/api/session';
+import { apiGet } from '@/api/server';
 import type { NotificationSettings } from '@/api/types';
 import { requireService } from '@/api/viewer';
 import { ListScreen } from '@/components/layout/list-screen';
@@ -17,9 +16,12 @@ export default async function SettingsPage() {
     notFound();
   }
 
-  const settings = await apiGet<NotificationSettings>('/notifications/settings', {
-    headers: await authHeaders(),
-  }).catch(() => ({ notifyChild: true, notifyApplication: true, notifyFeedback: true, notifyCollaborator: true }));
+  const settings = await apiGet<NotificationSettings>('/notifications/settings').catch(() => ({
+    notifyChild: true,
+    notifyApplication: true,
+    notifyFeedback: true,
+    notifyCollaborator: true,
+  }));
 
   return (
     <ListScreen
@@ -27,20 +29,21 @@ export default async function SettingsPage() {
       list={<SettingsForm settings={settings} handle={identity.handle} />}
       info={
         <div>
-          <p>учётка: @{identity.handle}</p>
+          <p>Учётка: @{identity.handle}.</p>
           <form action={signOut} className="mt-2">
             <button type="submit" className="frame px-2 py-1">
               выйти
             </button>
           </form>
-          <Hint>выход только с этого устройства, учётка остаётся</Hint>
+          <Hint>Выход только с этого устройства, учётка остаётся.</Hint>
         </div>
       }
       text={
         <div>
-          <h2>уведомления</h2>
+          <h2>уведомления и пароль</h2>
           <p>Слева галочки: что именно платформа шлёт вам в уведомления.</p>
           <p>Всё, что выключено, просто не попадёт в список, задним числом оно не приходит.</p>
+          <p>Смена пароля гасит вход на других устройствах, это устройство остаётся.</p>
         </div>
       }
     />

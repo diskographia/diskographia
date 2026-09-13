@@ -1,4 +1,6 @@
 import sharp from 'sharp';
+
+// границы видимого у всех png в папке: node tools/measure/alpha-box.mjs папка
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 

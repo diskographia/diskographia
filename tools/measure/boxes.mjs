@@ -1,5 +1,7 @@
 import sharp from 'sharp';
 
+// белые прямоугольники экранов в долях спрайта: node tools/measure/boxes.mjs файл.png
+
 const file = process.argv[2];
 const { data, info } = await sharp(file).resize({ width: 900, fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 

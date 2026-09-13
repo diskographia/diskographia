@@ -14,10 +14,10 @@ services:
       timeout: 5s
       retries: 20
 
+  # образы собирает github actions и кладёт в ghcr.io, на сервере они только тянутся.
+  # IMAGE_TAG в .env.production: latest либо sha-<коммит> для отката
   server:
-    build:
-      context: .
-      dockerfile: apps/server/Dockerfile
+    image: ${IMAGE_PREFIX:-ghcr.io/diskographia}/diskographia-server:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file: .env.production
     environment:
@@ -38,19 +38,11 @@ services:
         condition: service_healthy
 
   client:
-    build:
-      context: .
-      dockerfile: apps/client/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_UPLOADS_URL: ${NEXT_PUBLIC_UPLOADS_URL}
-        NEXT_PUBLIC_PLATFORM_HANDLE: ${NEXT_PUBLIC_PLATFORM_HANDLE}
-        NEXT_PUBLIC_HOME_SELECTION_SLUG: ${NEXT_PUBLIC_HOME_SELECTION_SLUG}
-        NEXT_PUBLIC_HOME_SHOWCASE_SLUG: ${NEXT_PUBLIC_HOME_SHOWCASE_SLUG}
-        NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG: ${NEXT_PUBLIC_PLATFORM_MANIFEST_SLUG}
-        NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE}
+    image: ${IMAGE_PREFIX:-ghcr.io/diskographia}/diskographia-client:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
+      # серверные запросы клиента идут к серверу по сети compose, а не через caddy и интернет
+      API_INTERNAL_URL: http://server:4000/api
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NEXT_PUBLIC_UPLOADS_URL: ${NEXT_PUBLIC_UPLOADS_URL}
       NEXT_PUBLIC_PLATFORM_HANDLE: ${NEXT_PUBLIC_PLATFORM_HANDLE}

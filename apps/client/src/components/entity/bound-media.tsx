@@ -2,10 +2,9 @@
 
 import dynamic from 'next/dynamic';
 
-import { fileUrl, previewUrl } from '@/api/client';
+import { fileUrl, previewUrl } from '@/api/urls';
 import type { MediaItem } from '@/api/types';
 import { StaticScreen } from '@/components/world/static-screen';
-import { SceneView } from '@/components/world/scene-view';
 
 import { useReading } from './reading';
 
@@ -13,39 +12,52 @@ const StreamFrame = dynamic(() => import('@/components/home/stream-frame').then(
   ssr: false,
 });
 
-// экран показа следит за тем, до какого места дочитали слева, и уступает выбранному с полки
-export function BoundMedia({ media, cover }: { media: MediaItem[]; cover: string | null }) {
+// three.js весит много и нужен только предметам со сценой
+const SceneView = dynamic(() => import('@/components/world/scene-view').then((module) => module.SceneView), {
+  ssr: false,
+  loading: () => <StaticScreen>сцена грузится</StaticScreen>,
+});
+
+interface BoundMediaProps {
+  media: MediaItem[];
+  cover: string | null;
+  title: string;
+}
+
+// экран показа следит за тем, до какого места дочитали слева, и уступает выбранному с полки.
+// номер метки ![[N]] и номер на полке считаются по одному списку media
+export function BoundMedia({ media, cover, title }: BoundMediaProps) {
   const { active, pinned } = useReading();
-  const pictures = media.filter((item) => item.file);
-  const chosen = pinned !== null ? media[pinned] : active === null ? null : pictures[active];
+  const chosen = pinned !== null ? media[pinned] : active === null ? null : media[active];
 
   if (chosen) {
     const kind = chosen.media.kind;
     const source = chosen.file ? (kind === 'image' ? previewUrl(chosen.file.path) : fileUrl(chosen.file.path)) : null;
+    const caption = chosen.media.title ?? title;
 
     if (kind === 'embed' && chosen.media.embedUrl) {
       return <StreamFrame url={chosen.media.embedUrl} className="h-full w-full" />;
     }
 
     if (kind === 'video' && source) {
-      return <video controls src={source} className="max-h-full max-w-full" />;
+      return <video controls src={source} title={caption} className="max-h-full max-w-full" />;
     }
 
     if (kind === 'model' && source) {
-      return <SceneView src={source} title={chosen.media.title ?? ''} />;
+      return <SceneView src={source} title={caption} />;
     }
 
     if (kind === 'audio') {
       return <StaticScreen>трек в плеере</StaticScreen>;
     }
 
-    if (source) {
-      return <img src={source} alt="" />;
+    if (kind === 'image' && source) {
+      return <img src={source} alt={caption} />;
     }
   }
 
   if (cover) {
-    return <img src={cover} alt="" />;
+    return <img src={cover} alt={title} />;
   }
 
   return <StaticScreen>no_signal</StaticScreen>;

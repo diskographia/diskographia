@@ -20,43 +20,53 @@ export interface ModuleSlots {
   caps?: ModuleCaps;
 }
 
-// пять экранов модуля: подпись ставится только там, где она нужна по смыслу
+// пять экранов модуля: у каждого свой спрайт в родной пропорции, подпись ставится только там, где она нужна по смыслу
 export function ModuleLayout({ feed, media, head, meta, text, caps }: ModuleSlots) {
   const cap: ModuleCaps = caps ?? {};
 
   return (
     <>
       <div className="slot slot-feed">
-        <div className="screen slot-body" data-hold data-scroll="feed">
-          {cap.feed ? <span className="screen-cap">{cap.feed}</span> : null}
-          {feed}
+        <div className="screen screen-feed">
+          <div className="slot-body" data-hold data-scroll="feed">
+            {cap.feed ? <span className="screen-cap">{cap.feed}</span> : null}
+            {feed}
+          </div>
         </div>
       </div>
 
       <div className="slot slot-media">
-        <div className="screen slot-body" data-hold>
-          {media}
+        <div className="screen screen-media">
+          <div className="slot-body" data-hold>
+            {media}
+          </div>
         </div>
       </div>
 
       <div className="slot slot-head">
-        <div className="screen screen-small slot-body" data-hold>
-          {cap.head ? <span className="screen-cap">{cap.head}</span> : null}
-          <Pager>{head}</Pager>
+        <div className="screen screen-head">
+          <div className="slot-body" data-hold>
+            {cap.head ? <span className="screen-cap">{cap.head}</span> : null}
+            <Pager>{head}</Pager>
+          </div>
         </div>
       </div>
 
       <div className="slot slot-meta">
-        <div className="screen screen-small slot-body" data-hold>
-          {cap.meta ? <span className="screen-cap">{cap.meta}</span> : null}
-          <Pager>{meta}</Pager>
+        <div className="screen screen-meta">
+          <div className="slot-body" data-hold>
+            {cap.meta ? <span className="screen-cap">{cap.meta}</span> : null}
+            <Pager>{meta}</Pager>
+          </div>
         </div>
       </div>
 
       <div className="slot slot-text">
-        <div className="screen slot-body" data-hold>
-          {cap.text ? <span className="screen-cap">{cap.text}</span> : null}
-          <Pager>{text}</Pager>
+        <div className="screen screen-text">
+          <div className="slot-body" data-hold>
+            {cap.text ? <span className="screen-cap">{cap.text}</span> : null}
+            <Pager>{text}</Pager>
+          </div>
         </div>
       </div>
 

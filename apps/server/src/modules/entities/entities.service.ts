@@ -1,5 +1,3 @@
-import { randomBytes } from 'node:crypto';
-
 import {
   BadRequestException,
   ConflictException,
@@ -17,10 +15,9 @@ import {
   type ReorderChildrenInput,
   type UpdateEntityInput,
 } from '@diskographia/shared';
-import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
-import { readEnv } from '../../config/env.js';
 import { DATABASE, type Database } from '../../database/database.module.js';
 import {
   entities,
@@ -43,12 +40,17 @@ import { EntityCardsService } from './entity-cards.service.js';
 
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 
+function isSlugCollision(failure: unknown): boolean {
+  const cause = failure instanceof Error && failure.cause ? failure.cause : failure;
+  const error = cause as { code?: string; constraint_name?: string } | null;
+
+  return error?.code === '23505' && error.constraint_name === 'entities_owner_slug_key';
+}
+
 export type ChildrenSort = 'added' | 'feedback';
 
 @Injectable()
 export class EntitiesService {
-  private readonly env = readEnv();
-
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly tagsService: TagsService,
@@ -59,25 +61,7 @@ export class EntitiesService {
 
   async create(ownerId: string, input: CreateEntityInput) {
     return this.db.transaction(async (tx) => {
-      const slug = await this.claimSlug(tx, ownerId, input.slug ?? slugify(input.title));
-
-      const [created] = await tx
-        .insert(entities)
-        .values({
-          kind: input.kind,
-          ownerId,
-          authorId: ownerId,
-          title: input.title,
-          slug,
-          descriptionMd: input.descriptionMd,
-          visibility: input.visibility,
-          shareKey: input.visibility === 'unlisted' ? randomBytes(16).toString('base64url') : null,
-        })
-        .returning();
-
-      if (!created) {
-        throw new ConflictException('объект не создался');
-      }
+      const created = await this.insertWithFreeSlug(tx, ownerId, input);
 
       if (input.kind === 'event' && input.event) {
         if (input.event.isGlobal) {
@@ -88,6 +72,9 @@ export class EntitiesService {
           entityId: created.id,
           startsAt: input.event.startsAt,
           endsAt: input.event.endsAt,
+          announceAt: input.event.announceAt,
+          announceMd: input.event.announceMd,
+          lingerDays: input.event.lingerDays,
           location: input.event.location,
           city: input.event.city,
           latitude: input.event.latitude === null ? null : String(input.event.latitude),
@@ -127,10 +114,6 @@ export class EntitiesService {
           title: input.title,
           descriptionMd: input.descriptionMd,
           visibility: input.visibility,
-          shareKey:
-            input.visibility === 'unlisted' && current.shareKey === null
-              ? randomBytes(16).toString('base64url')
-              : undefined,
           updatedAt: sql`now()`,
         })
         .where(eq(entities.id, id))
@@ -192,7 +175,7 @@ export class EntitiesService {
       .limit(1);
 
     if (!row) {
-      throw new NotFoundException('объект не найден');
+      throw new NotFoundException('предмет не найден');
     }
 
     await this.assertVisible(row.entity, viewerId);
@@ -235,8 +218,11 @@ export class EntitiesService {
       this.db.select().from(entityDisplayAuthors).where(eq(entityDisplayAuthors.entityId, entity.id)).limit(1),
     ]);
 
+    // поисковый вектор и служебные поля наружу не идут
+    const { searchVector: _vector, shareKey: _key, deletedAt: _deleted, ...visible } = entity;
+
     return {
-      ...entity,
+      ...visible,
       tags: tagRows.map((row) => row.name),
       event: event[0] ?? null,
       product: product[0] ?? null,
@@ -255,7 +241,7 @@ export class EntitiesService {
       .limit(1);
 
     if (!found) {
-      throw new NotFoundException('объект не найден');
+      throw new NotFoundException('предмет не найден');
     }
 
     return found;
@@ -266,8 +252,6 @@ export class EntitiesService {
     const parent = await this.findById(parentId);
 
     await this.assertVisible(parent, viewerId);
-
-    const insider = viewerId !== null && (parent.ownerId === viewerId || (await this.access.can(parentId, viewerId, 'edit')));
 
     const ordering =
       parent.kind === 'capsule'
@@ -286,7 +270,10 @@ export class EntitiesService {
         and(
           eq(entityChildren.parentId, parentId),
           eq(entityChildren.status, 'approved'),
-          ...(insider ? [] : [inArray(entities.visibility, ['public', 'unlisted'])]),
+          // чужой черновик не виден даже владельцу контейнера, свой виден только себе
+          viewerId
+            ? or(inArray(entities.visibility, ['public', 'unlisted']), eq(entities.ownerId, viewerId))
+            : inArray(entities.visibility, ['public', 'unlisted']),
         ),
       )
       .orderBy(...ordering);
@@ -296,7 +283,7 @@ export class EntitiesService {
     return rows.map((row, index) => ({ link: row.link, entity: cards[index]! }));
   }
 
-  // автор видит, куда его объект положили, и решает по чужим контейнерам
+  // автор видит, куда его предмет положили, и решает по чужим контейнерам
   async listParents(childId: string, actorId: string) {
     await this.requireOwned(childId, actorId);
 
@@ -360,16 +347,13 @@ export class EntitiesService {
       .returning();
 
     if (!updated) {
-      throw new NotFoundException('объект не лежит в этом контейнере');
+      throw new NotFoundException('предмет не лежит в этом контейнере');
     }
 
     return updated;
   }
 
-
-
-  // все свои, а не только выложенные в инвентарь
-  // свой список нужен и для черновиков, поэтому видимость идёт вместе с карточкой
+  // все свои, включая черновики, поэтому видимость идёт вместе с карточкой
   async listOwned(ownerId: string) {
     const rows = await this.db
       .select()
@@ -395,7 +379,7 @@ export class EntitiesService {
       .returning();
 
     if (!removed) {
-      throw new NotFoundException('объект не лежит в этом контейнере');
+      throw new NotFoundException('предмет не лежит в этом контейнере');
     }
   }
 
@@ -403,7 +387,7 @@ export class EntitiesService {
     const parent = await this.findById(parentId);
 
     if (!isContainerKind(parent.kind as EntityKind)) {
-      throw new BadRequestException('в этот объект нельзя ничего положить');
+      throw new BadRequestException('в этот предмет нельзя ничего положить');
     }
 
     if (!(await this.access.can(parentId, actorId, 'publish_into'))) {
@@ -412,20 +396,36 @@ export class EntitiesService {
 
     const child = await this.readable(input.childId, actorId);
 
-    // в капсулу кладут свободно, чужой объект в ивент ждёт согласия автора
+    // в капсулу кладут свободно, чужой предмет в ивент ждёт согласия автора
     const status = parent.kind === 'capsule' || child.ownerId === parent.ownerId ? 'approved' : 'pending';
 
     // номер ячейки нужен только при ручном порядке
     const slotIndex = parent.kind === 'capsule' ? (input.slotIndex ?? (await this.nextChildSlot(parentId))) : null;
 
+    const [existing] = await this.db
+      .select({ status: entityChildren.status })
+      .from(entityChildren)
+      .where(and(eq(entityChildren.parentId, parentId), eq(entityChildren.childId, child.id)))
+      .limit(1);
+
+    if (existing && existing.status !== 'declined') {
+      throw new ConflictException(
+        existing.status === 'pending' ? 'предмет уже ждёт согласия автора' : 'предмет уже лежит в этом контейнере',
+      );
+    }
+
+    // отказ не вечен: повторная просьба снова ждёт решения автора
     const [link] = await this.db
       .insert(entityChildren)
       .values({ parentId, childId: child.id, slotIndex, status })
-      .onConflictDoNothing({ target: [entityChildren.parentId, entityChildren.childId] })
+      .onConflictDoUpdate({
+        target: [entityChildren.parentId, entityChildren.childId],
+        set: { status, slotIndex, createdAt: sql`now()` },
+      })
       .returning();
 
     if (!link) {
-      throw new ConflictException('объект уже лежит в этом контейнере');
+      throw new ConflictException('предмет не лёг в контейнер');
     }
 
     if (child.ownerId !== actorId) {
@@ -434,6 +434,7 @@ export class EntitiesService {
         childTitle: child.title,
         parentId: parent.id,
         parentTitle: parent.title,
+        target: await this.addressOf(parent.id),
       });
     }
 
@@ -444,7 +445,7 @@ export class EntitiesService {
     const child = await this.findById(childId);
 
     if (child.ownerId !== actorId) {
-      throw new ForbiddenException('решение принимает автор объекта');
+      throw new ForbiddenException('решение принимает автор предмета');
     }
 
     const [updated] = await this.db
@@ -465,6 +466,7 @@ export class EntitiesService {
       parentId,
       parentTitle: parent.title,
       approved: approve,
+      target: await this.addressOf(parentId),
     });
 
     return updated;
@@ -475,6 +477,23 @@ export class EntitiesService {
 
     if (parent.kind !== 'capsule') {
       throw new BadRequestException('вручную порядок задаётся только в капсуле, в ивенте работает сортировка');
+    }
+
+    const rows = await this.db
+      .select({ childId: entityChildren.childId })
+      .from(entityChildren)
+      .where(eq(entityChildren.parentId, parentId));
+
+    const known = new Set(rows.map((row) => row.childId));
+    const given = new Set(input.order.map((item) => item.childId));
+    const slots = new Set(input.order.map((item) => item.slotIndex));
+
+    if (given.size !== input.order.length || slots.size !== input.order.length) {
+      throw new BadRequestException('в порядке каждый предмет и каждая ячейка встречаются по одному разу');
+    }
+
+    if (known.size !== given.size || [...given].some((childId) => !known.has(childId))) {
+      throw new BadRequestException('в порядке должны быть перечислены все вложенные предметы');
     }
 
     await this.db.transaction(async (tx) => {
@@ -489,12 +508,16 @@ export class EntitiesService {
     });
   }
 
-  // ячейка уникальна на автора, поэтому без номера берём следующую свободную
+  // ячейка уникальна на автора: занятая просьба уходит в следующую свободную
   async setInventorySlot(id: string, actorId: string, slotIndex: number | null) {
     const current = await this.requireOwned(id, actorId);
 
     const target =
-      slotIndex === null || current.inventorySlot === slotIndex ? slotIndex : await this.freeInventorySlot(actorId);
+      slotIndex === null || current.inventorySlot === slotIndex
+        ? slotIndex
+        : (await this.inventorySlotTaken(actorId, slotIndex))
+          ? await this.freeInventorySlot(actorId)
+          : slotIndex;
 
     const [updated] = await this.db
       .update(entities)
@@ -503,6 +526,16 @@ export class EntitiesService {
       .returning();
 
     return updated;
+  }
+
+  private async inventorySlotTaken(ownerId: string, slotIndex: number): Promise<boolean> {
+    const [taken] = await this.db
+      .select({ id: entities.id })
+      .from(entities)
+      .where(and(eq(entities.ownerId, ownerId), eq(entities.inventorySlot, slotIndex)))
+      .limit(1);
+
+    return !!taken;
   }
 
   private async freeInventorySlot(ownerId: string): Promise<number> {
@@ -539,11 +572,11 @@ export class EntitiesService {
     const [found] = await this.db.select().from(entities).where(eq(entities.id, id)).limit(1);
 
     if (!found || found.deletedAt === null) {
-      throw new NotFoundException('удалённого объекта нет');
+      throw new NotFoundException('удалённого предмета нет');
     }
 
     if (found.ownerId !== actorId) {
-      throw new ForbiddenException('объект принадлежит другому автору');
+      throw new ForbiddenException('предмет принадлежит другому автору');
     }
 
     const [restored] = await this.db
@@ -573,11 +606,23 @@ export class EntitiesService {
     return found;
   }
 
+  // адрес предмета для ссылки из уведомления
+  private async addressOf(entityId: string): Promise<{ handle: string; slug: string } | undefined> {
+    const [row] = await this.db
+      .select({ handle: profiles.handle, slug: entities.slug })
+      .from(entities)
+      .innerJoin(profiles, eq(profiles.id, entities.ownerId))
+      .where(eq(entities.id, entityId))
+      .limit(1);
+
+    return row;
+  }
+
   private async requireAllowed(id: string, actorId: string, needed: Permission) {
     const found = await this.findById(id);
 
     if (!(await this.access.can(id, actorId, needed))) {
-      throw new ForbiddenException('нет прав на это действие с объектом');
+      throw new ForbiddenException('нет прав на это действие с предметом');
     }
 
     return found;
@@ -587,7 +632,7 @@ export class EntitiesService {
     const found = await this.findById(id);
 
     if (found.ownerId !== actorId) {
-      throw new ForbiddenException('объект принадлежит другому автору');
+      throw new ForbiddenException('предмет принадлежит другому автору');
     }
 
     return found;
@@ -602,19 +647,37 @@ export class EntitiesService {
     return row?.next ?? 0;
   }
 
-  private async claimSlug(tx: Transaction, ownerId: string, desired: string): Promise<string> {
-    const base = desired.length > 0 ? desired : 'obekt';
+  // слаг уникален на владельца: занятый получает суффикс, гонка двух создателей ловится точкой сохранения
+  private async insertWithFreeSlug(tx: Transaction, ownerId: string, input: CreateEntityInput) {
+    const desired = input.slug ?? slugify(input.title);
+    const base = desired.length > 0 ? desired : 'predmet';
 
     for (let attempt = 0; attempt < 50; attempt += 1) {
       const candidate = attempt === 0 ? base : `${base}-${attempt + 1}`;
-      const [taken] = await tx
-        .select({ id: entities.id })
-        .from(entities)
-        .where(and(eq(entities.ownerId, ownerId), eq(entities.slug, candidate)))
-        .limit(1);
 
-      if (!taken) {
-        return candidate;
+      try {
+        const [created] = await tx.transaction((savepoint) =>
+          savepoint
+            .insert(entities)
+            .values({
+              kind: input.kind,
+              ownerId,
+              authorId: ownerId,
+              title: input.title,
+              slug: candidate,
+              descriptionMd: input.descriptionMd,
+              visibility: input.visibility,
+            })
+            .returning(),
+        );
+
+        if (created) {
+          return created;
+        }
+      } catch (failure) {
+        if (!isSlugCollision(failure)) {
+          throw failure;
+        }
       }
     }
 
@@ -623,10 +686,14 @@ export class EntitiesService {
 
   // глобальный ивент подменяет главную, поэтому только платформа
   private async assertGlobalAllowed(tx: Transaction, ownerId: string): Promise<void> {
-    const [owner] = await tx.select({ handle: profiles.handle }).from(profiles).where(eq(profiles.id, ownerId)).limit(1);
+    const [owner] = await tx
+      .select({ isPlatform: profiles.isPlatform })
+      .from(profiles)
+      .where(eq(profiles.id, ownerId))
+      .limit(1);
 
-    if (!owner || owner.handle.toLowerCase() !== this.env.PLATFORM_HANDLE.toLowerCase()) {
-      throw new ForbiddenException('глобальный ивент заводит только аккаунт платформы');
+    if (!owner?.isPlatform) {
+      throw new ForbiddenException('глобальный ивент заводит только учётка платформы');
     }
   }
 

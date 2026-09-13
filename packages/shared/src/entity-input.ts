@@ -16,20 +16,37 @@ export const handleSchema = z
 
 export const tagNameSchema = z.string().min(1).max(48);
 
-const eventDetailsSchema = z.object({
-  startsAt: z.iso.datetime({ offset: true }),
-  endsAt: z.iso.datetime({ offset: true }).nullable().default(null),
-  announceAt: z.iso.datetime({ offset: true }).nullable().default(null),
-  announceMd: z.string().max(20_000).default(''),
-  location: z.string().max(200).nullable().default(null),
-  city: z.string().max(80).nullable().default(null),
-  latitude: z.number().min(-90).max(90).nullable().default(null),
-  longitude: z.number().min(-180).max(180).nullable().default(null),
-  isGlobal: z.boolean().default(false),
-  lingerDays: z.number().int().min(0).max(365).default(0),
-  applicationsOpen: z.boolean().default(false),
-  applicationTtlDays: z.number().int().min(1).max(90).default(30),
-});
+// ссылка только по http и https: javascript: и прочее в href не попадёт
+export const webUrlSchema = z.url({ protocol: /^https?$/ });
+
+const DATE_MESSAGES = {
+  end: 'конец не может быть раньше начала',
+  announce: 'время анонса не может быть позже начала',
+};
+
+const datesInOrder = (value: { startsAt?: string; endsAt?: string | null }) =>
+  !value.startsAt || !value.endsAt || new Date(value.endsAt) >= new Date(value.startsAt);
+
+const announceInOrder = (value: { startsAt?: string; announceAt?: string | null }) =>
+  !value.startsAt || !value.announceAt || new Date(value.announceAt) <= new Date(value.startsAt);
+
+const eventDetailsSchema = z
+  .object({
+    startsAt: z.iso.datetime({ offset: true }),
+    endsAt: z.iso.datetime({ offset: true }).nullable().default(null),
+    announceAt: z.iso.datetime({ offset: true }).nullable().default(null),
+    announceMd: z.string().max(20_000).default(''),
+    location: z.string().max(200).nullable().default(null),
+    city: z.string().max(80).nullable().default(null),
+    latitude: z.number().min(-90).max(90).nullable().default(null),
+    longitude: z.number().min(-180).max(180).nullable().default(null),
+    isGlobal: z.boolean().default(false),
+    lingerDays: z.number().int().min(0).max(365).default(0),
+    applicationsOpen: z.boolean().default(false),
+    applicationTtlDays: z.number().int().min(1).max(90).default(30),
+  })
+  .refine(datesInOrder, { message: DATE_MESSAGES.end, path: ['endsAt'] })
+  .refine(announceInOrder, { message: DATE_MESSAGES.announce, path: ['announceAt'] });
 
 export const metaFieldSchema = z.object({
   label: z.string().min(1).max(60),
@@ -38,7 +55,7 @@ export const metaFieldSchema = z.object({
 
 export const linkFieldSchema = z.object({
   label: z.string().trim().min(1).max(80),
-  url: z.url().max(500),
+  url: webUrlSchema.max(500),
 });
 
 export const displayAuthorSchema = z.object({
@@ -48,13 +65,15 @@ export const displayAuthorSchema = z.object({
   note: z.string().max(200).nullable().default(null),
 });
 
-export const scheduleEntrySchema = z.object({
-  startsAt: z.iso.datetime({ offset: true }),
-  endsAt: z.iso.datetime({ offset: true }).nullable().default(null),
-  title: z.string().min(1).max(200),
-  shortMd: z.string().max(2000).default(''),
-  fullMd: z.string().max(50_000).default(''),
-});
+export const scheduleEntrySchema = z
+  .object({
+    startsAt: z.iso.datetime({ offset: true }),
+    endsAt: z.iso.datetime({ offset: true }).nullable().default(null),
+    title: z.string().min(1).max(200),
+    shortMd: z.string().max(2000).default(''),
+    fullMd: z.string().max(50_000).default(''),
+  })
+  .refine(datesInOrder, { message: DATE_MESSAGES.end, path: ['endsAt'] });
 
 // либо сумма с валютой, либо ценник словами, но не оба сразу
 const priceRule = (value: { priceAmount?: number | null; priceCurrency?: string | null; priceLabel?: string | null }) =>
@@ -62,10 +81,16 @@ const priceRule = (value: { priceAmount?: number | null; priceCurrency?: string 
 
 const PRICE_MESSAGE = 'нужна либо сумма с валютой, либо ценник словами';
 
+const currencySchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{3}$/, 'валюта задаётся тремя латинскими буквами, например RUB');
+
 const productDetailsSchema = z
   .object({
     priceAmount: z.number().nonnegative().nullable().default(null),
-    priceCurrency: z.string().length(3).nullable().default(null),
+    priceCurrency: currencySchema.nullable().default(null),
     priceLabel: z.string().max(48).nullable().default(null),
     contacts: z.string().min(1).max(500),
   })
@@ -103,25 +128,28 @@ export const createEntitySchema = z
   });
 
 // у правки нет значений по умолчанию: пропущенное поле не должно затирать сохранённое
-const eventUpdateSchema = z.object({
-  startsAt: z.iso.datetime({ offset: true }).optional(),
-  endsAt: z.iso.datetime({ offset: true }).nullable().optional(),
-  announceAt: z.iso.datetime({ offset: true }).nullable().optional(),
-  announceMd: z.string().max(20_000).optional(),
-  location: z.string().max(200).nullable().optional(),
-  city: z.string().max(80).nullable().optional(),
-  latitude: z.number().min(-90).max(90).nullable().optional(),
-  longitude: z.number().min(-180).max(180).nullable().optional(),
-  isGlobal: z.boolean().optional(),
-  lingerDays: z.number().int().min(0).max(365).optional(),
-  applicationsOpen: z.boolean().optional(),
-  applicationTtlDays: z.number().int().min(1).max(90).optional(),
-});
+const eventUpdateSchema = z
+  .object({
+    startsAt: z.iso.datetime({ offset: true }).optional(),
+    endsAt: z.iso.datetime({ offset: true }).nullable().optional(),
+    announceAt: z.iso.datetime({ offset: true }).nullable().optional(),
+    announceMd: z.string().max(20_000).optional(),
+    location: z.string().max(200).nullable().optional(),
+    city: z.string().max(80).nullable().optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+    isGlobal: z.boolean().optional(),
+    lingerDays: z.number().int().min(0).max(365).optional(),
+    applicationsOpen: z.boolean().optional(),
+    applicationTtlDays: z.number().int().min(1).max(90).optional(),
+  })
+  .refine(datesInOrder, { message: DATE_MESSAGES.end, path: ['endsAt'] })
+  .refine(announceInOrder, { message: DATE_MESSAGES.announce, path: ['announceAt'] });
 
 const productUpdateSchema = z
   .object({
     priceAmount: z.number().nonnegative().nullable().optional(),
-    priceCurrency: z.string().length(3).nullable().optional(),
+    priceCurrency: currencySchema.nullable().optional(),
     priceLabel: z.string().max(48).nullable().optional(),
     contacts: z.string().min(1).max(500).optional(),
   })

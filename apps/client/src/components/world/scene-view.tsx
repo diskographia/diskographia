@@ -127,17 +127,45 @@ export function SceneView({ src, title }: { src: string; title: string }) {
       }
     };
 
+    // esc снимает захват мыши мимо наших кнопок, режим должен вернуться к осмотру
+    const onUnlock = () => {
+      orbit.enabled = true;
+      box.dataset.walk = 'off';
+      setMode('orbit');
+    };
+
     box.addEventListener('walkmode', toggle);
+    walk.addEventListener('unlock', onUnlock);
 
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
       watcher.disconnect();
       box.removeEventListener('walkmode', toggle);
+      walk.removeEventListener('unlock', onUnlock);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       orbit.dispose();
       walk.disconnect();
+
+      // геометрия и текстуры живут в видеопамяти, renderer.dispose их не трогает
+      scene.traverse((node) => {
+        if (node instanceof THREE.Mesh) {
+          node.geometry.dispose();
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+
+          for (const material of materials) {
+            for (const value of Object.values(material)) {
+              if (value instanceof THREE.Texture) {
+                value.dispose();
+              }
+            }
+
+            material.dispose();
+          }
+        }
+      });
+
       renderer.dispose();
       renderer.domElement.remove();
     };
@@ -182,9 +210,9 @@ export function SceneView({ src, title }: { src: string; title: string }) {
         </button>
       </div>
 
-      {state === 'loading' ? <p className="absolute bottom-1 left-1">сцена грузится</p> : null}
-      {state === 'failed' ? <p className="absolute bottom-1 left-1">сцену не удалось открыть</p> : null}
-      {mode === 'walk' ? <p className="absolute bottom-1 left-1">ходьба: WASD, мышь осматривается, Esc выйти</p> : null}
+      {state === 'loading' ? <p className="absolute bottom-1 left-1">Сцена грузится</p> : null}
+      {state === 'failed' ? <p className="absolute bottom-1 left-1">Сцену не удалось открыть</p> : null}
+      {mode === 'walk' ? <p className="absolute bottom-1 left-1">Ходьба: WASD, мышь осматривается, Esc выйти</p> : null}
     </div>
   );
 }

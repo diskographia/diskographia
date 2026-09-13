@@ -1,23 +1,13 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { apiGet } from '@/api/client';
-import { authHeaders } from '@/api/session';
+import { apiGet } from '@/api/server';
+import type { MyApplication } from '@/api/types';
 import { requireService } from '@/api/viewer';
 import { ListScreen } from '@/components/layout/list-screen';
 import { routes } from '@/routes';
 
-interface Application {
-  eventId: string;
-  title: string;
-  slug: string;
-  ownerHandle: string;
-  status: 'pending' | 'accepted' | 'declined';
-  attachedEntityId: string | null;
-  createdAt: string;
-}
-
-const STATUS: Record<Application['status'], string> = {
+const STATUS: Record<MyApplication['status'], string> = {
   pending: 'ждёт решения',
   accepted: 'приняли',
   declined: 'отклонили',
@@ -32,10 +22,7 @@ export default async function ApplicationsPage() {
     notFound();
   }
 
-  const items = await apiGet<Application[]>('/events/applications/mine', { headers: await authHeaders() }).catch(
-    () => [],
-  );
-
+  const items = await apiGet<MyApplication[]>('/events/applications/mine').catch(() => []);
   const waiting = items.filter((item) => item.status === 'pending').length;
 
   return (
@@ -43,7 +30,7 @@ export default async function ApplicationsPage() {
       title="мои заявки"
       list={
         <>
-          {items.length === 0 ? <p>вы никуда не подавались</p> : null}
+          {items.length === 0 ? <p>Вы никуда не подавались.</p> : null}
 
           <ul>
             {items.map((item) => (
@@ -64,8 +51,8 @@ export default async function ApplicationsPage() {
       }
       info={
         <div>
-          <p>всего заявок: {items.length}</p>
-          <p>ждут решения: {waiting}</p>
+          <p>Всего заявок: {items.length}.</p>
+          <p>Ждут решения: {waiting}.</p>
         </div>
       }
       text={
