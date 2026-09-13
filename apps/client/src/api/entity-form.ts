@@ -13,6 +13,11 @@ function isoOrNull(value: FormDataEntryValue | null): string | null {
   return Number.isNaN(moment.getTime()) ? null : moment.toISOString();
 }
 
+// ссылка без схемы дописывается до https, сервер принимает только http и https
+function webUrl(url: string): string {
+  return /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`;
+}
+
 function numberOrNull(value: FormDataEntryValue | null): number | null {
   const text = String(value ?? '').trim();
 
@@ -30,7 +35,10 @@ export function entityPayload(form: FormData, kind: EntityKind): Record<string, 
       .map((tag) => tag.trim())
       .filter(Boolean),
     meta: JSON.parse(String(form.get('meta') ?? '[]')) as { label: string; value: string }[],
-    links: JSON.parse(String(form.get('links') ?? '[]')) as { label: string; url: string }[],
+    links: (JSON.parse(String(form.get('links') ?? '[]')) as { label: string; url: string }[]).map((link) => ({
+      ...link,
+      url: webUrl(link.url.trim()),
+    })),
     displayAuthor: String(form.get('displayAuthorName') ?? '').trim()
       ? {
           name: String(form.get('displayAuthorName')).trim(),
@@ -42,8 +50,9 @@ export function entityPayload(form: FormData, kind: EntityKind): Record<string, 
   };
 
   if (kind === 'event') {
+    // пустое начало значит сейчас, остальные даты не обязательны
     payload.event = {
-      startsAt: isoOrNull(form.get('startsAt')) ?? '',
+      startsAt: isoOrNull(form.get('startsAt')) ?? new Date().toISOString(),
       endsAt: isoOrNull(form.get('endsAt')),
       announceAt: isoOrNull(form.get('announceAt')),
       announceMd: String(form.get('announceMd') ?? ''),

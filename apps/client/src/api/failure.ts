@@ -1,11 +1,11 @@
-// сервер кладёт разбор по полям в issues, показываем его целиком
+// сервер кладёт разбор по полям в issues, показываем его целиком. путь приходит строкой, но на всякий случай и массив
 export async function failureText(response: Response): Promise<string> {
   const body = (await response.json().catch(() => null)) as
-    | { message?: string | string[]; issues?: { path?: (string | number)[]; message?: string }[] }
+    | { message?: string | string[]; issues?: { path?: string | (string | number)[]; message?: string }[] }
     | null;
 
   const issues = body?.issues
-    ?.map((issue) => [issue.path?.join('.'), issue.message].filter(Boolean).join(': '))
+    ?.map((issue) => [Array.isArray(issue.path) ? issue.path.join('.') : issue.path, issue.message].filter(Boolean).join(': '))
     .filter(Boolean);
 
   if (issues && issues.length > 0) {
