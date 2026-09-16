@@ -7,7 +7,6 @@ const STIFFNESS = 170;
 const DAMPING = 22;
 
 interface ElasticOptions {
-  limit: number;
   // куда класть сдвиг: элемент двигается сам, кто-то ещё может подстраиваться под него (провод за модулем)
   paint: (x: number, y: number) => void;
   // в захвате отказано: содержимое экранов, кнопки
@@ -15,7 +14,7 @@ interface ElasticOptions {
 }
 
 // упругий захват: тянешь, отпускаешь, пружиной возвращает на место. одна механика на модуль и на диск
-export function useElasticDrag({ limit, paint, skip }: ElasticOptions) {
+export function useElasticDrag({ paint, skip }: ElasticOptions) {
   const state = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
   const drag = useRef<{ pointerId: number; startX: number; startY: number; grabbed: boolean } | null>(null);
   const frame = useRef(0);
@@ -85,8 +84,8 @@ export function useElasticDrag({ limit, paint, skip }: ElasticOptions) {
       event.currentTarget.setPointerCapture(event.pointerId);
     }
 
-    state.current.x = Math.max(-limit, Math.min(limit, shiftX));
-    state.current.y = Math.max(-limit, Math.min(limit, shiftY));
+    state.current.x = shiftX;
+    state.current.y = shiftY;
     paint(state.current.x, state.current.y);
   }
 

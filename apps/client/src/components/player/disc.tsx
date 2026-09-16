@@ -4,8 +4,6 @@ import { useCallback, useRef } from 'react';
 
 import { useElasticDrag } from '@/components/world/elastic-drag';
 
-const PULL_LIMIT = 240;
-
 interface DiscProps {
   playing: boolean;
   idle: boolean;
@@ -22,7 +20,7 @@ export function Disc({ playing, idle, onPress }: DiscProps) {
     }
   }, []);
 
-  const { held, wasGrabbed, handlers } = useElasticDrag({ limit: PULL_LIMIT, paint });
+  const { held, wasGrabbed, handlers } = useElasticDrag({ paint });
 
   return (
     <div
