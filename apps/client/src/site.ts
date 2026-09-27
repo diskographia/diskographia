@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
-export const SITE_NAME = 'disk64.zip';
-export const SITE_TITLE = 'disk64.zip: Dисkographия';
+export const SITE_NAME = 'diskographia';
+export const SITE_TITLE = 'diskographia';
 
 // текст утверждён заказчиком, правки только пунктуационные.
 // короткий идёт в описание страницы для поисковиков, полный в карточку ссылки
