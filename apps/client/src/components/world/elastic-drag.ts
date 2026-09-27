@@ -13,20 +13,30 @@ interface ElasticOptions {
   skip?: (target: HTMLElement) => boolean;
 }
 
+interface Pull {
+  pointerId: number;
+  // до захвата точка нажатия, после — якорь, от которого отмеряется сдвиг
+  originX: number;
+  originY: number;
+  grabbed: boolean;
+}
+
 // упругий захват: тянешь, отпускаешь, пружиной возвращает на место. одна механика на модуль и на диск
 export function useElasticDrag({ paint, skip }: ElasticOptions) {
   const state = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
-  const drag = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    baseX: number;
-    baseY: number;
-    grabbed: boolean;
-  } | null>(null);
+  const drag = useRef<Pull | null>(null);
   const frame = useRef(0);
   const lastGrab = useRef(false);
   const [held, setHeld] = useState(false);
+
+  const move = useCallback(
+    (x: number, y: number) => {
+      state.current.x = x;
+      state.current.y = y;
+      paint(x, y);
+    },
+    [paint],
+  );
 
   const settle = useCallback(() => {
     cancelAnimationFrame(frame.current);
@@ -41,14 +51,12 @@ export function useElasticDrag({ paint, skip }: ElasticOptions) {
 
       body.vx += (-STIFFNESS * body.x - DAMPING * body.vx) * delta;
       body.vy += (-STIFFNESS * body.y - DAMPING * body.vy) * delta;
-      body.x += body.vx * delta;
-      body.y += body.vy * delta;
-
-      paint(body.x, body.y);
+      move(body.x + body.vx * delta, body.y + body.vy * delta);
 
       if (Math.abs(body.x) < 0.4 && Math.abs(body.y) < 0.4 && Math.abs(body.vx) < 2 && Math.abs(body.vy) < 2) {
-        Object.assign(body, { x: 0, y: 0, vx: 0, vy: 0 });
-        paint(0, 0);
+        body.vx = 0;
+        body.vy = 0;
+        move(0, 0);
         return;
       }
 
@@ -56,7 +64,7 @@ export function useElasticDrag({ paint, skip }: ElasticOptions) {
     };
 
     frame.current = requestAnimationFrame(step);
-  }, [paint]);
+  }, [move]);
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
@@ -66,15 +74,7 @@ export function useElasticDrag({ paint, skip }: ElasticOptions) {
     }
 
     cancelAnimationFrame(frame.current);
-    drag.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      // перехват на лету: тянем от места, где поймали, а не от нуля
-      baseX: state.current.x,
-      baseY: state.current.y,
-      grabbed: false,
-    };
+    drag.current = { pointerId: event.pointerId, originX: event.clientX, originY: event.clientY, grabbed: false };
     state.current.vx = 0;
     state.current.vy = 0;
   }
@@ -86,22 +86,20 @@ export function useElasticDrag({ paint, skip }: ElasticOptions) {
       return;
     }
 
-    const shiftX = event.clientX - pulled.startX;
-    const shiftY = event.clientY - pulled.startY;
-
-    if (!pulled.grabbed && Math.hypot(shiftX, shiftY) < GRAB_THRESHOLD) {
-      return;
-    }
-
     if (!pulled.grabbed) {
+      if (Math.hypot(event.clientX - pulled.originX, event.clientY - pulled.originY) < GRAB_THRESHOLD) {
+        return;
+      }
+
+      // перехват на лету: якорь встаёт так, чтобы тянуть от места, где поймали, а не от нуля
+      pulled.originX = event.clientX - state.current.x;
+      pulled.originY = event.clientY - state.current.y;
       pulled.grabbed = true;
       setHeld(true);
       event.currentTarget.setPointerCapture(event.pointerId);
     }
 
-    state.current.x = pulled.baseX + shiftX;
-    state.current.y = pulled.baseY + shiftY;
-    paint(state.current.x, state.current.y);
+    move(event.clientX - pulled.originX, event.clientY - pulled.originY);
   }
 
   function release(event: React.PointerEvent<HTMLElement>): void {
