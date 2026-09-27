@@ -14,7 +14,6 @@ import { Passage } from './passage';
 const RATIO = 2600 / 1757;
 const MARGIN = 8;
 const BLEED = 1.07;
-const PAN_LIMIT = 240;
 const CABLE_DRAG = 0.55;
 const NARROW = 900;
 const SHORT = 500;
@@ -45,7 +44,7 @@ export function WorldCanvas({ children }: { children: ReactNode }) {
 
   // за содержимое экранов не тянем, там выделяется текст и жмутся кнопки
   const skip = useCallback((target: HTMLElement) => !!target.closest('[data-hold]'), []);
-  const { held, handlers } = useElasticDrag({ limit: PAN_LIMIT, paint, skip });
+  const { held, handlers } = useElasticDrag({ paint, skip });
 
   useEffect(() => {
     const fit = () => {
