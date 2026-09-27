@@ -8,10 +8,9 @@ import { AdminBar } from '@/components/admin/admin-bar';
 import { PlayerProvider } from '@/components/player/player-provider';
 import { SessionKeeper } from '@/components/session-keeper';
 import { FloatingLogos } from '@/components/world/floating-logos';
-import { NoiseBackground } from '@/components/world/noise-background';
 import { FrameActionsProvider } from '@/components/world/frame-actions';
-import { LeaveGuardProvider } from '@/components/world/leave-guard';
 import { HereProvider } from '@/components/world/here';
+import { LeaveGuardProvider } from '@/components/world/leave-guard';
 import { WorldCanvas } from '@/components/world/world-canvas';
 import { SITE_FULL, SITE_NAME, SITE_SHORT, SITE_TITLE } from '@/site';
 
@@ -40,7 +39,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="ru" className="h-full">
       <body className="min-h-full">
-        <NoiseBackground />
         <FloatingLogos />
         <AdminBar />
         {identity ? <SessionKeeper /> : null}
