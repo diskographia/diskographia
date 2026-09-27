@@ -16,7 +16,14 @@ interface ElasticOptions {
 // упругий захват: тянешь, отпускаешь, пружиной возвращает на место. одна механика на модуль и на диск
 export function useElasticDrag({ paint, skip }: ElasticOptions) {
   const state = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
-  const drag = useRef<{ pointerId: number; startX: number; startY: number; grabbed: boolean } | null>(null);
+  const drag = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+    grabbed: boolean;
+  } | null>(null);
   const frame = useRef(0);
   const lastGrab = useRef(false);
   const [held, setHeld] = useState(false);
@@ -59,7 +66,15 @@ export function useElasticDrag({ paint, skip }: ElasticOptions) {
     }
 
     cancelAnimationFrame(frame.current);
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, grabbed: false };
+    drag.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      // перехват на лету: тянем от места, где поймали, а не от нуля
+      baseX: state.current.x,
+      baseY: state.current.y,
+      grabbed: false,
+    };
     state.current.vx = 0;
     state.current.vy = 0;
   }
@@ -84,8 +99,8 @@ export function useElasticDrag({ paint, skip }: ElasticOptions) {
       event.currentTarget.setPointerCapture(event.pointerId);
     }
 
-    state.current.x = shiftX;
-    state.current.y = shiftY;
+    state.current.x = pulled.baseX + shiftX;
+    state.current.y = pulled.baseY + shiftY;
     paint(state.current.x, state.current.y);
   }
 
